@@ -1,5 +1,5 @@
 # NodeFootPrint
-![Node.js CI](https://github.com/web-resilience/NodeFootPrint/actions/workflows/node-FootPrint.yaml/badge.svg)
+![Node.js CI](https://github.com/web-resilience/NodeFootPrint/actions/workflows/nodeFootPrint.yaml/badge.svg)
 
 Un **agent Node.js** pour mesurer :
 
