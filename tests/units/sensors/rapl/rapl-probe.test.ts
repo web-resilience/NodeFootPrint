@@ -24,10 +24,22 @@ test('rapl-probe test-suite', async (t) => {
     });
 
     await t.test('should respond DEGRADED when RAPL is not available (no permission)', async () => {
-        const probe = await raplProbe('/sys/class/powercap' );
+        const raplePackage =  await createRaplPackages(tmpRoot, 'intel-rapl:0', {
+            name: 'package-0',
+            energy: 123456789n,
+            maxRange: 987654321n
+        });
+
+        // Retirer les permissions de lecture sur le fichier energy_uj
+        await fs.chmod(raplePackage.files.energyPath, 0o000);
+
+        const probe = await raplProbe(tmpRoot);
         assert.strictEqual(probe.status, 'DEGRADED');
         assert.strictEqual(probe.packages.length, 1);
         assert.strictEqual(probe.packages[0].reason, 'permission_denied');
+
+        // Rétablir les permissions pour le nettoyage
+        await fs.chmod(raplePackage.files.energyPath, 0o644);
     });
 
     await t.test('should respond FAILED when : no RAPL packages found', async () => {
