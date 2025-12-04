@@ -3,4 +3,5 @@ node_modules/
 .env
 *.tsbuildinfo   
 pnpm-debug.log*
-
+coverage/
+pnpm-lock.yaml
