@@ -6,7 +6,8 @@
   "type": "module",
   "scripts": {
     "test": "c8 node --import tsx --test \"tests/**/*.test.{js,ts}\"",
-    "dev": "tsx watch src/index.ts",
+    "dev": "sudo $(which node) --import tsx bin/cli.ts",
+    "dev:server":"curl -s  http://localhost:3000/metrics | jq . || echo 'No data yet'",
     "build": "tsc -b",
     "start": "node --import tsx src/index.ts"
   },
