@@ -1,5 +1,5 @@
 import process from "node:process";
-import { raplProbe, RaplReader, startMainLoop } from "../src/index.js";
+import { CpuReader, raplProbe, RaplReader, startMainLoop } from "../src/index.js";
 import { FastifyInstance } from "fastify";
 
 let shareData: any = {};
@@ -28,11 +28,13 @@ async function main() {
     }
     //initialize rapl reader
     const raplReader = new RaplReader({ probe, log: 'debug' });
+    const cpuReader = new CpuReader({});
     //start main loop
     loop = startMainLoop({
         periodMs: 1000,
         samplers: {
             raplReader,
+            cpuReader
         },
         shareData,
     });

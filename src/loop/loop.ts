@@ -1,10 +1,11 @@
 import os from "os";
-import { RaplReader } from "../index.js";
+import { CpuReader, RaplReader } from "../index.js";
 
 interface LoopOptions {
   periodMs?: number;
   samplers: {
     raplReader: RaplReader;
+    cpuReader: CpuReader;
   };
   shareData?: any;
 }
@@ -24,46 +25,36 @@ export function startMainLoop(options: LoopOptions) {
     const nowNs = process.hrtime.bigint();
 
     try {
-      const raplSample = await options.samplers.raplReader.sample(nowNs);
+      const { raplReader, cpuReader } = options.samplers;
+      const [raplSample, cpuSample] = await Promise.all([
+        raplReader ? raplReader.sample(nowNs) : Promise.resolve(null),
+        cpuReader ? cpuReader.sample(nowNs) : Promise.resolve(null)
+      ]);
 
-      if (!raplSample) {
-        return;
-      }
+      if (raplSample && raplSample.ok && raplSample.primed && options.shareData) {
 
-      if (!raplSample.primed || !raplSample.ok) {
-        // pas encore de delta exploitable ou pas de lecture valide
-        return;
-      }
+        const { powerW, deltaJ, deltaTimeTs, packages } = raplSample;
+        //total tous packages
+        // valeurs brutes
+        const hostPowerWatts = powerW;
+        const hostPowerPerCpuWatts = powerW / numberOfCPUs;
+        const hostEnergyJoules = deltaJ;
+        const hostEnergyPerCpuJoules = deltaJ / numberOfCPUs;
+        const intervalSeconds = deltaTimeTs;
+        const perPackage = [];
 
-      const { powerW, deltaJ, deltaTimeTs, packages } = raplSample;
-
-      //total tous packages
-      // valeurs brutes
-      const hostPowerWatts = powerW;
-      const hostPowerPerCpuWatts = powerW / numberOfCPUs;
-      const hostEnergyJoules = deltaJ;
-      const hostEnergyPerCpuJoules = deltaJ / numberOfCPUs;
-      const intervalSeconds = deltaTimeTs;
-
-
-      const perPackage = [];
-      //par Packages
-      for (const pkg of packages) {
-        // traitement par package si nécessaire
-        perPackage.push({
-          node: pkg.node,
-          deltaJ: Number(pkg.deltaJ.toFixed(3)),
-          powerW: Number(pkg.powerW.toFixed(3)),
-          wraps: pkg.wraps,
-          hint: "Details for this CPU package",
-        });
-      }
-
-      const timestamp = new Date().toISOString();
-
-
-
-      if (options.shareData) {
+        //par Packages
+        for (const pkg of packages) {
+          // traitement par package si nécessaire
+          perPackage.push({
+            node: pkg.node,
+            deltaJ: Number(pkg.deltaJ.toFixed(3)),
+            powerW: Number(pkg.powerW.toFixed(3)),
+            wraps: pkg.wraps,
+            hint: "Details for this CPU package",
+          });
+        }
+        const timestamp = new Date().toISOString();
         options.shareData.timestamp = timestamp;
         options.shareData.rapl = {
           hostPowerWatts: {
@@ -95,7 +86,41 @@ export function startMainLoop(options: LoopOptions) {
           },
           perPackage // détails par package si besoin
         };
+
+
       }
+
+      //-------------cpu utilisation---------
+
+      if (
+        cpuSample &&
+        cpuSample.ok &&
+        cpuSample.primed &&
+        options.shareData
+      ) {
+        const cpuUtil = cpuSample.cpuUtilization; // 0–1
+        const cpuUtilPercent = cpuUtil * 100;
+
+        options.shareData.cpu = {
+          utilizationRatio: {
+            value: cpuUtil,
+            unit: "",
+            hint: "Global CPU utilization ratio (0–1) derived from /proc/stat",
+          },
+          utilizationPercent: {
+            value: Number(cpuUtilPercent.toFixed(2)),
+            unit: "%",
+            hint: "Global CPU utilization percentage derived from /proc/stat",
+          },
+          intervalSeconds: {
+            value: Number(cpuSample.deltaTimeTs.toFixed(3)),
+            unit: "s",
+            hint: "Sampling interval duration in seconds for CPU metrics",
+          },
+          deltaTotalTicks:Number(cpuSample.deltaTotalTicks)
+        };
+      }
+
     } catch (error) {
       console.error("Error in main loop tick:", error);
     } finally {
