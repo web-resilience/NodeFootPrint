@@ -7,7 +7,7 @@ import { accessReadable } from "../../../utils/file-utils.js";
 type RaplStatus = 'OK' | 'DEGRADED' | 'FAILED';
 type RaplVendor = 'intel' | 'amd' | 'unknown';
 
-interface RaplPackageInfo {
+export interface RaplPackageInfo {
   vendor: RaplVendor;
   node: string;
   path: string;
@@ -22,7 +22,7 @@ interface RaplPackageInfo {
   };
 }
 
-interface RaplProbeResult {
+export interface RaplProbeResult {
   status: RaplStatus;
   vendor?: RaplVendor;
   packages: RaplPackageInfo[];
@@ -34,78 +34,74 @@ const DEFAULT_BASE_PATH = '/sys/class/powercap';
 
 
 /**
- * Sonde l’interface RAPL (Running Average Power Limit) exposée par le noyau
- * Linux via la hiérarchie sysfs `powercap` et retourne une description des
- * paquets CPU détectés.
+ * Probes the RAPL (Running Average Power Limit) interface exposed by the Linux kernel
+ * via the sysfs `powercap` hierarchy and returns a description of detected CPU packages.
  *
- * La fonction inspecte le répertoire `basePath` (par défaut `/sys/class/powercap`),
- * parcourt ses sous-répertoires et sélectionne ceux dont le fichier `name`
- * contient la sous-chaîne `"package-"`. Pour chaque paquet RAPL trouvé, elle
- * essaie de récupérer :
+ * The function inspects the `basePath` directory (default `/sys/class/powercap`),
+ * iterates through its subdirectories, and selects those whose `name` file contains
+ * the substring `"package-"`. For each RAPL package found, it attempts to retrieve:
  *
- * - le compteur d’énergie cumulée `energy_uj` (en microjoules) ;
- * - la valeur de wrap du compteur `max_energy_uj`, si disponible ;
- * - le chemin réel du fichier `energy_uj` (via `realpath`, si possible).
+ * - the cumulative energy counter `energy_uj` (in microjoules);
+ * - the wrap value of the counter `max_energy_uj`, if available;
+ * - the real path of the `energy_uj` file (via `realpath`, if possible).
  *
- * Les erreurs liées au système de fichiers (répertoire absent, permissions,
- * fichiers manquants, etc.) sont **attrapées** et reflétées dans la structure
- * de retour : la fonction ne lance pas d’exception et retourne toujours
- * un objet de résultat.
+ * Filesystem errors (missing directory, permissions, missing files, etc.) are **caught**
+ * and reflected in the return structure: the function never throws and always returns
+ * a result object.
  *
- * ### Statut retourné
+ * ### Returned status
  *
- * Le champ `status` du résultat peut prendre les valeurs suivantes :
+ * The `status` field of the result can take the following values:
  *
- * - `"OK"` :
- *   - au moins un paquet RAPL a été détecté ;
- *   - au moins un fichier `energy_uj` est lisible.
+ * - `"OK"`:
+ *   - at least one RAPL package was detected;
+ *   - at least one `energy_uj` file is readable.
  *
- * - `"DEGRADED"` :
- *   - des paquets RAPL ont été détectés ;
- *   - **aucun** fichier `energy_uj` n’est lisible (par exemple permissions insuffisantes).
+ * - `"DEGRADED"`:
+ *   - RAPL packages were detected;
+ *   - **no** `energy_uj` file is readable (e.g., insufficient permissions).
  *
- * - `"FAILED"` :
- *   - aucun paquet RAPL n’a été trouvé dans `basePath` **ou**
- *   - le répertoire `basePath` est inaccessible ou inexistant.
+ * - `"FAILED"`:
+ *   - no RAPL package was found in `basePath` **or**
+ *   - the `basePath` directory is inaccessible or does not exist.
  *
- * Dans les cas `"DEGRADED"` ou `"FAILED"`, le champ `hint` fournit un message
- * textuel pour aider au diagnostic (chemin introuvable, absence de paquets,
- * problème de permissions, etc.).
+ * In `"DEGRADED"` or `"FAILED"` cases, the `hint` field provides a textual message
+ * to help with diagnostics (missing path, no packages, permission issues, etc.).
  *
- * ### Structure du résultat
+ * ### Result structure
  *
- * L’objet retourné contient au minimum :
+ * The returned object contains at least:
  *
- * - `status` : `"OK" | "DEGRADED" | "FAILED"`.
- * - `packages` : tableau d’objets décrivant les paquets RAPL détectés
- *   (éventuellement vide si `status === "FAILED"`).
- * - `hint` : chaîne explicative ou `null`/non défini lorsque tout va bien.
- * - `vendor` : le constructeur principal déduit des paquets, si connu :
- *   - `"intel"` si un paquet `intel-rapl:*` lisible est trouvé,
- *   - `"amd"` si un paquet `amd-rapl:*` lisible est trouvé,
- *   - `"unknown"` sinon.
+ * - `status`: `"OK" | "DEGRADED" | "FAILED"`.
+ * - `packages`: array of objects describing detected RAPL packages
+ *   (possibly empty if `status === "FAILED"`).
+ * - `hint`: explanatory string or `null`/undefined when all is well.
+ * - `vendor`: the main vendor deduced from the packages, if known:
+ *   - `"intel"` if a readable `intel-rapl:*` package is found,
+ *   - `"amd"` if a readable `amd-rapl:*` package is found,
+ *   - `"unknown"` otherwise.
  *
- * Chaque entrée du tableau `packages` possède les champs suivants :
+ * Each entry in the `packages` array has the following fields:
  *
- * - `vendor` : `"intel" | "amd" | "unknown"` — déduit du nom de nœud
- *   (préfixe `intel-rapl` ou `amd-rapl`).
- * - `node` : nom du répertoire sous `basePath` (par ex. `"intel-rapl:0"`).
- * - `path` : chemin absolu du répertoire du paquet (par ex.
+ * - `vendor`: `"intel" | "amd" | "unknown"` — deduced from the node name
+ *   (prefix `intel-rapl` or `amd-rapl`).
+ * - `node`: directory name under `basePath` (e.g., `"intel-rapl:0"`).
+ * - `path`: absolute path to the package directory (e.g.,
  *   `"/sys/class/powercap/intel-rapl:0"`).
- * - `name` : contenu du fichier `name` (par ex. `"package-0"`).
- * - `energyPath` : chemin réel résolu de `energy_uj` si possible, sinon
- *   le chemin nominal.
- * - `hasEnergyReadable` : `true` si `energy_uj` est lisible, `false` sinon.
- * - `reason` : message d’erreur associé (par ex. permission refusée),
- *   ou `null` si `hasEnergyReadable === true`.
- * - `maxEnergyUj` : valeur numérique de `max_energy_uj` (wrap du compteur
- *   en microjoules), ou `null` si le fichier est absent, illisible ou invalide.
- * - `files` :
- *   - `files.energyUj` : chemin utilisé pour lire `energy_uj`
- *     (souvent identique à `energyPath`),
- *   - `files.maxEnergyUj` : chemin du fichier `max_energy_uj`.
+ * - `name`: content of the `name` file (e.g., `"package-0"`).
+ * - `energyPath`: resolved real path of `energy_uj` if possible, otherwise
+ *   the nominal path.
+ * - `hasEnergyReadable`: `true` if `energy_uj` is readable, `false` otherwise.
+ * - `reason`: associated error message (e.g., permission denied),
+ *   or `null` if `hasEnergyReadable === true`.
+ * - `maxEnergyUj`: numeric value of `max_energy_uj` (counter wrap in microjoules),
+ *   or `null` if the file is missing, unreadable, or invalid.
+ * - `files`:
+ *   - `files.energyUj`: path used to read `energy_uj`
+ *     (often identical to `energyPath`),
+ *   - `files.maxEnergyUj`: path to the `max_energy_uj` file.
  *
- * ### Utilisation typique
+ * ### Typical usage
  *
  * ```ts
  * const result = await raplProbe();
@@ -113,24 +109,22 @@ const DEFAULT_BASE_PATH = '/sys/class/powercap';
  * if (result.status === 'OK' || result.status === 'DEGRADED') {
  *   for (const pkg of result.packages) {
  *     console.log(
- *       `Paquet ${pkg.name} (${pkg.vendor}) à ${pkg.path}, lisible:`,
+ *       `Package ${pkg.name} (${pkg.vendor}) at ${pkg.path}, readable:`,
  *       pkg.hasEnergyReadable
  *     );
  *   }
  * } else {
- *   console.warn('RAPL non disponible:', result.hint);
+ *   console.warn('RAPL not available:', result.hint);
  * }
  * ```
  *
  * @param basePath
- *   Chemin racine de la hiérarchie powercap à sonder. Par défaut
- *   `/sys/class/powercap`. Peut être surchargé pour des tests
- *   (fake sysfs, chroot, etc.).
+ *   Root path of the powercap hierarchy to probe. Defaults to `/sys/class/powercap`.
+ *   Can be overridden for testing (fake sysfs, chroot, etc.).
  *
  * @returns
- *   Une promesse résolue avec un objet décrivant le statut global
- *   de la sonde, les paquets RAPL détectés et des indications
- *   de diagnostic (`hint`).
+ *   A promise resolved with an object describing the overall status,
+ *   detected RAPL packages, and diagnostic hints (`hint`).
  */
 export async function raplProbe(basePath: string = DEFAULT_BASE_PATH): Promise<RaplProbeResult> {
 

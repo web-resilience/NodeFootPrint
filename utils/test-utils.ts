@@ -1,6 +1,10 @@
 import { join } from 'path';
 import { mkdir, writeFile } from 'fs/promises';
 
+export function nowNs(n:number): bigint {
+    return BigInt(Math.round(n * 1e9));
+}
+
 export async function createRaplPackages(baseDir:string, nodeName:string, { name = 'package-0', energy = 0n, maxRange = 0n } = {}) {
     const pkgDir = join(baseDir, nodeName);
     await mkdir(pkgDir, { recursive: true });

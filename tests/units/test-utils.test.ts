@@ -7,33 +7,33 @@ import { join } from 'node:path';
 
 import { createRaplPackages } from '../../utils/test-utils.js';
 
-test('createRaplPackages crée les fichiers avec les valeurs par défaut (maxRange=0n → pas de fichier max_range)', async () => {
+test('createRaplPackages creates files with default values (maxRange=0n → no max_range file)', async () => {
   const baseDir = await mkdtemp(join(tmpdir(), 'rapl-test-default-'));
   const nodeName = 'intel-rapl:0';
 
   try {
-    // On passe un objet vide pour utiliser les valeurs par défaut
+    // We pass an empty object to use default values
     const { dir, files } = await createRaplPackages(baseDir, nodeName, {});
 
-    // Le répertoire retourné doit être baseDir/nodeName
+    // The returned directory should be baseDir/nodeName
     assert.strictEqual(dir, join(baseDir, nodeName));
 
-    // Fichier "name"
+    // File "name"
     const nameContent = await readFile(files.namePath, 'utf8');
     assert.strictEqual(nameContent, 'package-0');
 
-    // Fichier "energy_uj"
+    // File "energy_uj"
     const energyContent = await readFile(files.energyPath, 'utf8');
     assert.strictEqual(energyContent, '0'); // String(0n)
 
-    // Comme maxRange=0n, le fichier ne doit pas exister
+    // As maxRange=0n, the file should not exist
     await assert.rejects(access(files.maxRangePath));
   } finally {
     await rm(baseDir, { recursive: true, force: true });
   }
 });
 
-test('createRaplPackages écrit les valeurs fournies et crée max_energy_range_uj si maxRange > 0n', async () => {
+test('createRaplPackages writes the provided values and creates max_energy_range_uj if maxRange > 0n', async () => {
   const baseDir = await mkdtemp(join(tmpdir(), 'rapl-test-custom-'));
   const nodeName = 'intel-rapl:1';
 

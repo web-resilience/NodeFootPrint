@@ -8,25 +8,25 @@ import process from 'node:process';
 
 import { accessReadable, listDirectories, listFiles } from '../../utils/file-utils.js';
 
-// Répertoire temporaire pour les tests
+// Temporary directory for tests
 const tmpRoot = path.join(os.tmpdir(), `file-utils-tests-${process.pid}`);
 
 before(async () => {
-// Création du répertoire temporaire
+// Create the temporary directory
   await fs.rm(tmpRoot, { recursive: true, force: true });
   await fs.mkdir(tmpRoot, { recursive: true });
 });
 
 after(async () => {
-  // Nettoyage du répertoire temporaire
+  // Clean up the temporary directory
   await fs.rm(tmpRoot, { recursive: true, force: true });
 });
 
 // ----------------------
-// Tests pour accessReadable
+// Tests for accessReadable
 // ----------------------
 
-test('accessReadable retourne ok:true quand le fichier existe et est lisible', async () => {
+test('accessReadable returns ok:true when the file exists and is readable', async () => {
   const dir = path.join(tmpRoot, 'access-ok');
   await fs.mkdir(dir, { recursive: true });
 
@@ -38,7 +38,7 @@ test('accessReadable retourne ok:true quand le fichier existe et est lisible', a
   assert.deepStrictEqual(result, { ok: true });
 });
 
-test('accessReadable retourne ok:false avec erreur "not_found" quand le fichier est absent', async () => {
+test('accessReadable returns ok:false with error "not_found" if the file does not exist', async () => {
   const dir = path.join(tmpRoot, 'access-enoent');
   await fs.mkdir(dir, { recursive: true });
 
@@ -53,30 +53,30 @@ test('accessReadable retourne ok:false avec erreur "not_found" quand le fichier 
 });
 
 // ----------------------
-// Tests pour listDirectories
+// Tests for listDirectories
 // ----------------------
 
-test('listDirectories retourne uniquement les dossiers immédiats', async () => {
+test('listDirectories returns only immediate directories', async () => {
   const base = path.join(tmpRoot, 'list-directories');
   await fs.rm(base, { recursive: true, force: true });
   await fs.mkdir(base, { recursive: true });
 
-  // Création de deux dossiers
+  // Create two directories
   await fs.mkdir(path.join(base, 'dir1'));
   await fs.mkdir(path.join(base, 'dir2'));
 
-  // Et deux fichiers
+  // And two files
   await fs.writeFile(path.join(base, 'file1.txt'), '');
   await fs.writeFile(path.join(base, 'file2.log'), '');
 
   const dirs = await listDirectories(base);
 
-  // On ne teste pas l'ordre, on trie d'abord
+  // We do not test the order, we sort first
   const sorted = dirs.sort();
   assert.deepStrictEqual(sorted, ['dir1', 'dir2']);
 });
 
-test('listDirectories retourne un tableau vide si aucun sous-dossier', async () => {
+test('listDirectories returns empty array if no subdirectories', async () => {
   const base = path.join(tmpRoot, 'list-directories-empty');
   await fs.rm(base, { recursive: true, force: true });
   await fs.mkdir(base, { recursive: true });
@@ -87,19 +87,19 @@ test('listDirectories retourne un tableau vide si aucun sous-dossier', async () 
 });
 
 // ----------------------
-// Tests pour listFiles
+// Tests for listFiles
 // ----------------------
 
-test('listFiles retourne uniquement les fichiers immédiats', async () => {
+test('listFiles returns only immediate files', async () => {
   const base = path.join(tmpRoot, 'list-files');
   await fs.rm(base, { recursive: true, force: true });
   await fs.mkdir(base, { recursive: true });
 
-  // Fichiers
+  // Files
   await fs.writeFile(path.join(base, 'a.txt'), '');
   await fs.writeFile(path.join(base, 'b.md'), '');
 
-  // Dossiers
+  // Directories
   await fs.mkdir(path.join(base, 'subdir1'));
   await fs.mkdir(path.join(base, 'subdir2'));
 
@@ -109,7 +109,7 @@ test('listFiles retourne uniquement les fichiers immédiats', async () => {
   assert.deepStrictEqual(sorted, ['a.txt', 'b.md']);
 });
 
-test('listFiles retourne un tableau vide si aucun fichier', async () => {
+test('return empty array if no files', async () => {
   const base = path.join(tmpRoot, 'list-files-empty');
   await fs.rm(base, { recursive: true, force: true });
   await fs.mkdir(base, { recursive: true });

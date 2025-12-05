@@ -4,7 +4,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
 import process from 'node:process';
-import { raplProbe } from '../../../../src/sensors/rapl/rapl-probe.js';
+import { raplProbe } from '../../../../src/index.js';
 import { createRaplPackages } from '../../../../utils/test-utils.js';
 
 
