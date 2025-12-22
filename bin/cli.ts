@@ -1,5 +1,5 @@
 import process from "node:process";
-import { CpuReader, raplProbe, RaplReader, startMainLoop } from "../src/index.js";
+import { CpuReader, createEnergyReader, raplProbe,startMainLoop } from "../src/index.js";
 import { FastifyInstance } from "fastify";
 
 let shareData: any = {};
@@ -27,7 +27,7 @@ async function main() {
         return;
     }
     //initialize rapl reader
-    const raplReader = new RaplReader({ probe, log: 'debug' });
+    const raplReader = createEnergyReader({ probe, log: 'debug' });
     const cpuReader = new CpuReader({});
     //start main loop
     loop = startMainLoop({
