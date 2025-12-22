@@ -52,12 +52,16 @@ export function clampDt(dt: number, min = 0.2, max = 5): number {
 export class RaplReader {
     private state: RaplReaderState | null = null;
     private log: 'silent' | 'debug';
+    private probeStatus: string | null = null;
+    private probeHints: string | null = null;
 
     constructor(options: RaplReaderOptions) {
         const { probe, log } = options;
         this.log = log ?? 'silent';
 
         if (!probe) {
+            this.probeStatus = 'NO_PROBE';
+            this.probeHints = 'no probe data provided';
             if (this.log === 'debug') {
                 console.error('RAPL reader initialized without probe data');
             }
@@ -65,6 +69,8 @@ export class RaplReader {
         }
 
         if (probe.status !== 'OK') {
+            this.probeStatus = probe.status;
+            this.probeHints = probe.hint ?? 'rapl probe failed';
             console.error('RAPL reader initialized with invalid probe status:', probe.status);
             if (probe.hint) {
                 console.info('RAPL reader hint:', probe.hint);
@@ -77,9 +83,20 @@ export class RaplReader {
         );
 
         if (packages.length === 0) {
-            console.error('RAPL reader initialized without readable packages');
+            //probe OK But Unreadable packages 
+            this.probeStatus = 'INTERNAL_ERROR';
+            this.probeHints = 'Contract violation: probe.status=OK but no readable packages (this is a bug)';
+            console.error('⚠️  [RaplReader] ASSERTION FAILED: probe contract violated');
+            console.error('    Expected: probe.status=OK implies at least one readable package');
+            console.error('    Got: 0 readable packages');
+             if (this.log === 'debug') {
+                console.error('    Probe data:', JSON.stringify(probe, null, 2));
+            }
             return;
         }
+        
+        this.probeStatus = 'OK';
+        this.probeHints = null;
 
         this.state = {
             lastNs: null,
@@ -90,11 +107,19 @@ export class RaplReader {
                 file: p.files.energyUj!,
                 lastUj: null,
                 maxEnergyUj:
-                    p.maxEnergyUj != null && Number.isFinite(p.maxEnergyUj)
+                    p.maxEnergyUj != null && Number.isFinite(p.maxEnergyUj) && p.maxEnergyUj > 0
                         ? BigInt(p.maxEnergyUj)
                         : null,
             })),
         };
+    }
+
+    get status() {
+        return this.probeStatus;
+    }
+
+    get hint() {
+        return this.probeHints;
     }
 
     /**
@@ -106,6 +131,7 @@ export class RaplReader {
 
     /**
      * Ne pas appeler en parallèle sur la même instance.
+     *  Considérer un cache temporaire si les lectures sont très fréquentes
      */
     async sample(nowNs: bigint): Promise<RaplSample | null> {
         if (!this.state) {

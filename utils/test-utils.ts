@@ -21,3 +21,32 @@ export async function createRaplPackages(baseDir:string, nodeName:string, { name
 
     return { dir: pkgDir, files: { namePath, energyPath, maxRangePath } };
 }
+
+
+export async function createStatFileUnderControl (baseDir:string,stats:{user:number,nice:number,system:number,idle:number}) {
+    const _stats = {
+        user:stats.user ?? 1000, 
+        nice:0,
+        system:500,
+        idle:2000
+    };
+
+    const { user, nice,system,idle} = _stats;
+
+    const statPath = join(baseDir,`stat-${process.pid}`);
+
+    const cpuLine = `cpu ${user} ${nice} ${system} ${idle} 0 0 0 0 0 0\n`;
+    const content = cpuLine + `cpu0 ${user} ${nice} ${system} ${idle} 0 0 0 0 0 0\n`;
+
+    try {
+        await writeFile(statPath,content,'utf-8');
+        return statPath;
+    } catch (error) {
+        if(error instanceof Error || (error && typeof error === 'object' && 'message' in error)) {
+            console.error(error.message);
+        } else {
+            console.error(String(error));
+        }
+    }
+    
+}

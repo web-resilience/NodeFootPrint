@@ -9,7 +9,8 @@
     "dev": "sudo $(which node) --import tsx bin/cli.ts",
     "dev:server":"curl -s  http://localhost:3000/metrics | jq . || echo 'No data yet'",
     "build": "tsc -b",
-    "start": "node --import tsx src/index.ts"
+    "start": "node --import tsx src/index.ts",
+    "stress:cpu":""
   },
   "keywords": [],
   "author": "",

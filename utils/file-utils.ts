@@ -3,19 +3,19 @@ import { constants as F } from 'node:fs';
 
 type AccessResult = | {ok:true} | {ok:false,error:string};
 
-function reasonFromCode(code:string | undefined) {
+export function reasonFromCode(code:string | undefined) {
   const reason = code || 'UNKNOWN';
   const map:Record<string, string> = {
     EACCES: 'permission_denied',
     EPERM: 'operation_not_permitted',
-    ENOENT: 'not_found',
+    ENOENT: 'file_not_found',
     ELOOP:  'symlink_loop',
     ENOTDIR:'not_a_directory'
   };
   return map[reason] || reason.toLowerCase();
 }
 
-function extractErrorCode(error:unknown):string | undefined {
+export function extractErrorCode(error:unknown):string | undefined {
     if (typeof error === 'object' 
       && error !== null && 'code' in error
       && typeof(error as {code:unknown}).code === 'string'

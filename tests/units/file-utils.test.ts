@@ -48,7 +48,7 @@ test('accessReadable returns ok:false with error "not_found" if the file does no
 
   assert.strictEqual(result.ok, false);
   if (!result.ok) {
-    assert.strictEqual(result.error, 'not_found');
+    assert.strictEqual(result.error, 'file_not_found');
   }
 });
 
