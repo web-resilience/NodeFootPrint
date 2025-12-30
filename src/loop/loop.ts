@@ -27,14 +27,14 @@ export function startMainLoop(options: LoopOptions) {
 
     try {
       const { energyReader, cpuReader } = options.samplers;
-      const [raplSample, cpuSample] = await Promise.all([
+      const [energySample, cpuSample] = await Promise.all([
         energyReader ? energyReader.sample(nowNs) : Promise.resolve(null),
         cpuReader ? cpuReader.sample(nowNs) : Promise.resolve(null)
       ]);
 
-      if (raplSample && raplSample.ok && raplSample.primed && options.shareData) {
+      if (energySample && energySample.ok && energySample.primed && options.shareData) {
 
-        const { powerW, deltaJ, deltaTimeTs, packages } = raplSample;
+        const { powerW, deltaJ, deltaTimeTs, packages } = energySample;
         //total tous packages
         // valeurs brutes
         const hostPowerWatts = powerW;
