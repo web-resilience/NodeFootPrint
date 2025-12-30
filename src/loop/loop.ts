@@ -1,10 +1,11 @@
 import os from "os";
 import { CpuReader, RaplReader } from "../index.js";
+import { EnergyReader } from "../sensors/rapl/enregyReader.js";
 
 interface LoopOptions {
   periodMs?: number;
   samplers: {
-    raplReader: RaplReader;
+    energyReader: EnergyReader;
     cpuReader: CpuReader;
   };
   shareData?: any;
@@ -25,9 +26,9 @@ export function startMainLoop(options: LoopOptions) {
     const nowNs = process.hrtime.bigint();
 
     try {
-      const { raplReader, cpuReader } = options.samplers;
+      const { energyReader, cpuReader } = options.samplers;
       const [raplSample, cpuSample] = await Promise.all([
-        raplReader ? raplReader.sample(nowNs) : Promise.resolve(null),
+        energyReader ? energyReader.sample(nowNs) : Promise.resolve(null),
         cpuReader ? cpuReader.sample(nowNs) : Promise.resolve(null)
       ]);
 

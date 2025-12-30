@@ -22,18 +22,20 @@ async function main() {
     process.stdout.write('\n');
     //probe rapl
     const probe = await raplProbe();
+    /*
     if (probe.status !== 'OK') {
         console.error('RAPL probe failed:', probe.status, probe.hint);
         return;
     }
+    */
     //initialize rapl reader
-    const raplReader = createEnergyReader({ probe, log: 'debug' });
+    const energyReader = createEnergyReader({ probe, log: 'debug' });
     const cpuReader = new CpuReader({});
     //start main loop
     loop = startMainLoop({
         periodMs: 1000,
         samplers: {
-            raplReader,
+            energyReader,
             cpuReader
         },
         shareData,

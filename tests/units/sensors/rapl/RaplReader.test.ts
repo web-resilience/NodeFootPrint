@@ -6,9 +6,6 @@ import { createRaplPackages, nowNs } from '../../../../utils/test-utils.js';
 import { chmod, rm, writeFile,mkdir}from 'node:fs/promises';
 import os from 'node:os';
 
-
-
-
 test('RaplReader - sample energy consumption', async (t) => {
 
     await t.test('PRIME: fist tick should return the prime values', async () => {
