@@ -11,17 +11,15 @@ export interface RaplPackageSample {
   path: string;
   deltaUj: number; // µJ
   deltaJ: number;  // J
-  powerW: number;  // W
   wraps: number;
   ok: boolean;     // lecture OK pour ce package sur ce tick ?
 }
 export interface RaplSample {
     ok: boolean;
     primed?: boolean;
-    deltaTimeTs: number;
+    internalClampedDt: number;
     deltaUj: number;   // µJ
     deltaJ: number;    // J
-    powerW: number;    // W
     packages: RaplPackageSample[];
     wraps: number;
 }
@@ -123,15 +121,20 @@ export class RaplReader {
     }
 
     /**
-     * Indique si le lecteur est correctement initialisé (probe OK + packages lisibles).
+     * tell if the reader is ready to sample energy data (i.e. probe was successful)
      */
     get isReady(): boolean {
         return this.state !== null;
     }
 
     /**
-     * Ne pas appeler en parallèle sur la même instance.
-     *  Considérer un cache temporaire si les lectures sont très fréquentes
+     * do not call if isReady === false
+     *
+     * Samples RAPL energy data and computes deltas since last sample.
+     *
+     * @param nowNs  Current timestamp in nanoseconds
+     * @returns      RaplSample containing energy deltas and power estimates    
+     *  Consider a temporary cache if readings are very frequent
      */
     async sample(nowNs: bigint): Promise<RaplSample | null> {
         if (!this.state) {
@@ -140,7 +143,7 @@ export class RaplReader {
 
         const state = this.state;
 
-        // --- 1) Première mesure : priming ---
+        // --- 1) first measure : priming ---
         if (state.lastNs === null) {
             state.lastNs = nowNs;
 
@@ -162,27 +165,25 @@ export class RaplReader {
                 path: pkg.path,
                 deltaUj: 0,
                 deltaJ: 0,
-                powerW: 0,
                 wraps: 0,
                 ok,
             }));
 
             const ok = primeResults.some((r) => r.ok);
 
-            // primed = false :  pas encore de delta exploitable
+            // primed = false :  not exploitable delta yet
             return {
                 ok,
                 primed: false,
-                deltaTimeTs: 0,
+                internalClampedDt: 0,
                 deltaUj: 0,
                 deltaJ: 0,
-                powerW: 0,
                 packages,
                 wraps: 0,
             };
         }
 
-        // --- 2) Mesures suivantes : vrais deltas ---
+        // --- 2) true measurement: compute deltas ---
 
         // log debug
         if (this.log === "debug" && process.stdout.isTTY) {
@@ -196,8 +197,8 @@ export class RaplReader {
         let primed = false;
         let successfulReads = 0;
 
-        let deltaTimeTs = Number(nowNs - state.lastNs) / 1e9;
-        deltaTimeTs = clampDt(deltaTimeTs);
+        let internalClampedDt = Number(nowNs - state.lastNs) / 1e9;
+        internalClampedDt = clampDt(internalClampedDt);
         state.lastNs = nowNs;
 
         const readResults = await Promise.all(
@@ -215,7 +216,7 @@ export class RaplReader {
         const packageSamples: RaplPackageSample[] = [];
 
         for (const { pkg, currentUJ } of readResults) {
-            // lecture OK pour ce package ?
+            // read result for this package
             let pkgDeltaUj = 0n;
             let pkgWraps = 0n;
             let pkgOk = false;
@@ -225,10 +226,10 @@ export class RaplReader {
                 successfulReads++;
 
                 if (pkg.lastUj === null) {
-                    // on n'avait pas d'historique pour ce package (erreur précédente, etc.)
+                    // DIDN'T HAVE HISTORY → priming for this package
                     pkg.lastUj = currentUJ;
                 } else {
-                    // ici on a un historique → vrai delta
+                    // HAD HISTORY → can compute delta
                     primed = true;
 
                     let deltaUj = currentUJ - pkg.lastUj;
@@ -251,14 +252,12 @@ export class RaplReader {
 
             const deltaUjNumber = Number(pkgDeltaUj);
             const deltaJ = deltaUjNumber / 1e6;
-            const powerW = deltaTimeTs > 0 ? deltaJ / deltaTimeTs : 0;
 
             packageSamples.push({
                 node: pkg.node,
                 path: pkg.path,
                 deltaUj: deltaUjNumber,
                 deltaJ,
-                powerW,
                 wraps: Number(pkgWraps),
                 ok: pkgOk,
             });
@@ -266,15 +265,14 @@ export class RaplReader {
 
         const ok = successfulReads > 0;
 
-        //si pas de delta d'énergie total, on évite les divisions par zéro
+        // if no total energy delta, avoid division by zero
         if (totalDeltaUj === 0n) {
             return {
                 ok,
                 primed,
-                deltaTimeTs,
+                internalClampedDt,
                 deltaUj: 0,
                 deltaJ: 0,
-                powerW: 0,
                 packages: packageSamples,
                 wraps: Number(wraps),
             };
@@ -282,15 +280,13 @@ export class RaplReader {
 
         const totalDeltaUjNumber = Number(totalDeltaUj);
         const totalDeltaJ = totalDeltaUjNumber / 1e6;
-        const totalPowerW = totalDeltaJ / deltaTimeTs;
 
         return {
             ok,
             primed,
-            deltaTimeTs,
+            internalClampedDt,
             deltaUj: totalDeltaUjNumber,
             deltaJ: totalDeltaJ,
-            powerW: totalPowerW,
             packages: packageSamples,
             wraps: Number(wraps),
         };

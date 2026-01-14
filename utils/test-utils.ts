@@ -50,3 +50,19 @@ export async function createStatFileUnderControl (baseDir:string,stats:{user:num
     }
     
 }
+
+export function generateStatSample({ pid, utime, stime, starttime, delay, hz = 100 }: { pid: number; utime: number; stime: number; starttime: number; delay: number; hz?: number }) {
+    const delta_ticks = Math.round(delay * hz);
+    const new_utime = utime + Math.floor(delta_ticks / 2);
+    const new_stime = stime + Math.ceil(delta_ticks / 2);
+
+    const fields = [
+        pid, '(node)', 'S', 52710, 52711, 52710, 34819, 52711, 4194560,
+        18391, 0, 1, 0,
+        new_utime, new_stime, 0, 0, 20, 0, 11, 0,
+        starttime, 1278586880, 17245, '18446744073709551615', 1, 1, 0, 0, 0, 0, 0,
+        16781312, 134235650, 0, 0, 0, 17, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+    ];
+
+    return fields.join(' ');
+}

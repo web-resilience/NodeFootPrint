@@ -28,7 +28,6 @@ test('RaplReader - sample energy consumption', async (t) => {
                 path: pkg.dir,
                 deltaJ:0,
                 deltaUj:0,
-                powerW:0,
                 wraps:0,
                 ok:true
             };
@@ -37,9 +36,8 @@ test('RaplReader - sample energy consumption', async (t) => {
                 primed:false,
                 deltaUj: 0,
                 //clamped between 0.2s and 5s
-                deltaTimeTs: 0,
+                internalClampedDt: 0,
                 deltaJ: 0,
-                powerW: 0,
                 packages: [
                     expectedPackage
                 ],
@@ -83,16 +81,14 @@ test('RaplReader - sample energy consumption', async (t) => {
                 ok: true,
                 primed:true,
                 deltaUj: 2000000,
-                deltaTimeTs: 1,
+                internalClampedDt: 1,
                 deltaJ: 2000000e-6,
-                powerW: 2,
                 packages: [
                     {
                         node: 'intel-rapl:0',
                         path: pkg.dir,
                         deltaJ: 2,
                         deltaUj: 2000000,
-                        powerW: 2,
                         wraps: 0,
                         ok: true
                     }
@@ -135,16 +131,14 @@ test('RaplReader - sample energy consumption', async (t) => {
                 ok: true,
                 primed:true,
                 deltaUj: 2000000,
-                deltaTimeTs: 1,
+                internalClampedDt: 1,
                 deltaJ: 2000000e-6,
-                powerW: 2,
                 packages: [
                     {
                         node: 'intel-rapl:0',
                         path: pkg.dir,
                         deltaJ: 2,
                         deltaUj: 2000000,
-                        powerW: 2,
                         wraps: 1,
                         ok: true
                     }
@@ -197,16 +191,14 @@ test('RaplReader - sample energy consumption', async (t) => {
                 ok: true,
                 primed:true,
                 deltaUj: 4000000,
-                deltaTimeTs: 1,
+                internalClampedDt: 1,
                 deltaJ: 4000000e-6,
-                powerW: 4,
                 packages: [
                     {
                         node: 'intel-rapl:0',
                         path: pkg0.dir,
                         deltaJ: 2,
                         deltaUj: 2000000,
-                        powerW: 2,
                         wraps: 0,
                         ok: true
                     },
@@ -215,7 +207,6 @@ test('RaplReader - sample energy consumption', async (t) => {
                         path: pkg1.dir,
                         deltaJ: 2,
                         deltaUj: 2000000,
-                        powerW: 2,
                         wraps: 0,
                         ok: true
                     }

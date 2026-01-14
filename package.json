@@ -6,6 +6,9 @@
   "type": "module",
   "scripts": {
     "test": "c8 node --import tsx --test \"tests/**/*.test.{js,ts}\"",
+    "test:rapl": "c8 node --import tsx --test tests/units/sensors/rapl/RaplReader.test.ts",
+    "test:cpu": "c8 node --import tsx --test tests/units/sensors/cpus/CpuReader.test.ts",
+    "test:process": "c8 node --import tsx --test tests/units/sensors/cpus/ProcessCpuReader.test.ts",
     "dev": "sudo $(which node) --import tsx bin/cli.ts",
     "dev:server":"curl -s  http://localhost:3000/metrics | jq . || echo 'No data yet'",
     "build": "tsc -b",

@@ -90,10 +90,10 @@ test('CpuReader test suite', async (t) => {
             const sample1 = await reader.sample(nowNs);
 
             assert.ok(sample1.ok);
-            assert.equal(sample1.deltaTimeTs,0);
+            assert.equal(sample1.internalClampedDt,0);
             assert.equal(sample1.primed,false);
             assert.equal(sample1.cpuUtilization,0);
-            assert.equal(sample1.deltaTotalTicks,0n);
+            assert.equal(sample1.cpuTicks.deltaTotalTicks,0n);
 
             statFilePath = await createStatFileUnderControl(temp,{user: 2500,nice:200, system: 600, idle: 2200});
 
@@ -103,9 +103,9 @@ test('CpuReader test suite', async (t) => {
 
             assert.ok(sample2.ok);
             assert.ok(sample2.primed);
-            assert.ok(sample2.deltaTimeTs >= 0.001 && sample2.deltaTimeTs <= 10);
-            assert.equal(sample2.deltaTimeTs,clampDt(2));
-            assert.equal(sample2.deltaTotalTicks,1500n);
+            assert.ok(sample2.internalClampedDt >= 0.001 && sample2.internalClampedDt <= 10);
+            assert.equal(sample2.internalClampedDt,clampDt(2));
+            assert.equal(sample2.cpuTicks.deltaTotalTicks,1500n);
             assert.equal(sample2.cpuUtilization,1);
             
 
@@ -118,6 +118,23 @@ test('CpuReader test suite', async (t) => {
         
 
 
+    });
+    await t.test('CpuReader.sample KO on invalid stat file', async (t) => {
+        let statFile: string | undefined;
+        try {
+            const temp = os.tmpdir();
+            statFile = path.join(temp, `stat-invalid-${process.pid}`);
+            await writeFile(statFile, 'invalid content');
+            const reader = new CpuReader({ statFilePath: statFile });
+            const nowNs = process.hrtime.bigint();
+            const sample = await reader.sample(nowNs);
+            assert.equal(sample.ok, false);
+            assert.equal(sample.error, 'invalid_file_content');
+        } finally {
+            if (statFile) {
+                await rm(statFile, { recursive: true, force: true });
+            }
+        }
     });
 });
 

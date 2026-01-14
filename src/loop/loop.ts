@@ -1,97 +1,130 @@
-import os from "os";
-import { CpuReader, RaplReader } from "../index.js";
+import { buildJsonSnapshot, CpuReader, estimateCarbonFootprint, HostToPidSlidingWindow, ProcessCpuReader } from "../index.js";
 import { EnergyReader } from "../sensors/rapl/enregyReader.js";
+import { createWriteStream } from "fs";
+import { once } from "events";
 
 interface LoopOptions {
   periodMs?: number;
+  slidingWindowSize?: number;
+  emissionFactor?: {
+    countryCode: string;
+    factor_g: number;
+    unit: 'gCO2e/kWh';
+  }
   samplers: {
     energyReader: EnergyReader;
     cpuReader: CpuReader;
+    processCpuReader?: ProcessCpuReader;
   };
+  output?: {
+    path?: string;//ex: './metrics.jsonl'
+    flush?: boolean;//TODO:fsync for each tick (optional, default false)
+  }
   shareData?: any;
 }
 
-export function startMainLoop(options: LoopOptions) {
+export async function startMainLoop(options: LoopOptions) {
   const periodMs = options.periodMs ?? 1000;
+  const slidingWindowSize = options.slidingWindowSize ?? 10;
+
+  const emissionFactor = options.emissionFactor ?? {
+    countryCode: 'GLOBAL',
+    factor_g: 475, // global average gCO2e/kWh,
+    unit: 'gCO2e/kWh'// to check consistency
+  };
+
   let inFlight = false;
-  const numberOfCPUs = os.cpus().length || 1;
+  let lastLoopMs: bigint | null = null;
+
+  const slidingWindow = new HostToPidSlidingWindow({
+    windowSize: slidingWindowSize,
+  });
+
+  let outputStream: ReturnType<typeof createWriteStream> | null = null;
+
+  if (options.output?.path) {
+    outputStream = createWriteStream(options.output.path,
+      {
+        flags: 'a',//append only
+        encoding: 'utf-8',
+        autoClose: true
+      },
+    );
+
+     // wait for opening fd
+    await once(outputStream, 'open');
+  }
 
   const tick = async () => {
     if (inFlight) {
-      // skip si le tick précédent n'est pas fini
+      // skip if the previous tick is not finished
       return;
     }
 
     inFlight = true;
     const nowNs = process.hrtime.bigint();
 
+    // real time delta from last loop
+    let intervalSeconds = 0;
+    if (lastLoopMs !== null) {
+      intervalSeconds = Number(nowNs - lastLoopMs) / 1e9;
+    }
+
+    lastLoopMs = nowNs;
+
     try {
-      const { energyReader, cpuReader } = options.samplers;
-      const [energySample, cpuSample] = await Promise.all([
+      const { energyReader, cpuReader, processCpuReader } = options.samplers;
+      const [energySample, cpuSample, processCpuSample] = await Promise.all([
         energyReader ? energyReader.sample(nowNs) : Promise.resolve(null),
-        cpuReader ? cpuReader.sample(nowNs) : Promise.resolve(null)
+        cpuReader ? cpuReader.sample(nowNs) : Promise.resolve(null),
+        processCpuReader ? processCpuReader.sample() : Promise.resolve(null)
       ]);
 
+      if (!options.shareData) {
+        return;
+      }
+
+      //-------------TimeStamp---------
+      options.shareData.timestamp = new Date().toISOString();
+      if (intervalSeconds) {
+        options.shareData.intervalSeconds = intervalSeconds;
+      }
+      //-------------energy consumption---------
       if (energySample && energySample.ok && energySample.primed && options.shareData) {
 
-        const { powerW, deltaJ, deltaTimeTs, packages } = energySample;
-        //total tous packages
-        // valeurs brutes
-        const hostPowerWatts = powerW;
-        const hostPowerPerCpuWatts = powerW / numberOfCPUs;
+        const { deltaJ, packages, internalClampedDt } = energySample;
+        // total across all packages
+        // raw values
         const hostEnergyJoules = deltaJ;
-        const hostEnergyPerCpuJoules = deltaJ / numberOfCPUs;
-        const intervalSeconds = deltaTimeTs;
         const perPackage = [];
 
-        //par Packages
+        // per CPU package
         for (const pkg of packages) {
-          // traitement par package si nécessaire
+          // processing per package if needed
           perPackage.push({
             node: pkg.node,
             deltaJ: Number(pkg.deltaJ.toFixed(3)),
-            powerW: Number(pkg.powerW.toFixed(3)),
             wraps: pkg.wraps,
             hint: "Details for this CPU package",
           });
         }
-        const timestamp = new Date().toISOString();
-        options.shareData.timestamp = timestamp;
+
         options.shareData.rapl = {
-          hostPowerWatts: {
-            value: Number(hostPowerWatts.toFixed(3)),
-            unit: "W",
-            hint: "Total host power consumption as measured by RAPL",
-          },
-          hostPowerPerCpuWatts: {
-            value: Number(hostPowerPerCpuWatts.toFixed(3)),
-            unit: "W",
-            hint: "Host power consumption per CPU core as measured by RAPL",
-          },
           hostEnergyJoules: {
             value: Number(hostEnergyJoules.toFixed(3)),
             unit: "J",
             hint:
               "Total host energy consumption over the interval as measured by RAPL",
           },
-          hostEnergyPerCpuJoules: {
-            value: Number(hostEnergyPerCpuJoules.toFixed(3)),
-            unit: "J",
-            hint:
-              "Host energy consumption per CPU core over the interval as measured by RAPL",
-          },
-          intervalSeconds: {
-            value: Number(intervalSeconds.toFixed(3)),
-            unit: "s",
-            hint: "Sampling interval duration in seconds",
-          },
-          perPackage // détails par package si besoin
+          perPackage, // details per CPU package
+          meta: {
+            internalClampedDt
+          }
         };
-
-
       }
 
-      //-------------cpu utilisation---------
+
+      //-------------cpu / host utilisation---------
 
       if (
         cpuSample &&
@@ -99,28 +132,96 @@ export function startMainLoop(options: LoopOptions) {
         cpuSample.primed &&
         options.shareData
       ) {
-        const cpuUtil = cpuSample.cpuUtilization; // 0–1
-        const cpuUtilPercent = cpuUtil * 100;
 
+        const { deltaActiveTicks, deltaIdleTicks, deltaTotalTicks, unit } = cpuSample.cpuTicks;
+        const internalCpuDt = cpuSample.internalClampedDt;
         options.shareData.cpu = {
-          utilizationRatio: {
-            value: cpuUtil,
-            unit: "",
-            hint: "Global CPU utilization ratio (0–1) derived from /proc/stat",
+          cpuTicks: {
+            unit,
+            //!!important do not convert to number, keep bigint as string
+            deltaActiveTicks: deltaActiveTicks.toString(),
+            deltaIdleTicks: deltaIdleTicks.toString(),
+            deltaTotalTicks: deltaTotalTicks.toString()
           },
-          utilizationPercent: {
-            value: Number(cpuUtilPercent.toFixed(2)),
-            unit: "%",
-            hint: "Global CPU utilization percentage derived from /proc/stat",
-          },
-          intervalSeconds: {
-            value: Number(cpuSample.deltaTimeTs.toFixed(3)),
-            unit: "s",
-            hint: "Sampling interval duration in seconds for CPU metrics",
-          },
-          deltaTotalTicks:Number(cpuSample.deltaTotalTicks)
+          meta: {
+            internalClampedDt: internalCpuDt
+          }
         };
       }
+      //-------------process cpu utilisation---------
+      if (processCpuSample && processCpuSample.ok && options.shareData) {
+        //attribute host energy to process
+        const result = slidingWindow.push({
+          hostEnergyJoules: options.shareData.rapl?.hostEnergyJoules.value ?? 0,
+          hostCpuActiveTicks: options.shareData.cpu?.cpuTicks.deltaActiveTicks ? BigInt(options.shareData.cpu.cpuTicks.deltaActiveTicks) : 0n,
+          processCpuActiveTicks: processCpuSample.cpuTicks.deltaActive
+        });
+
+        if (result.ok) {
+          options.shareData.process = {
+            pid: processCpuSample.pid,
+            cpuShare: result.cpuShare,
+            energyJoules: result.processEnergyJoules,
+            windowSamples: result.samples,
+            windowCpuTicks: result.windowCpuTicks,
+            windowEnergy: result.windowEnergy,
+            isActive: result.isActive
+          }
+
+        } else {
+          options.shareData.process = {
+            ok: false,
+            pid: processCpuSample.pid,
+            error: result.reason || 'attribution_failed'
+          }
+        }
+      }
+
+      if (!options.shareData.process?.energyJoules) {
+        return;
+      }
+
+      //-------------carbon emissions---------
+      const carbon = estimateCarbonFootprint({
+        energyJoules: options.shareData.process?.energyJoules,
+        emissionFactor: emissionFactor.factor_g,
+      });
+
+      if (carbon.ok) {
+        options.shareData.carbon = {
+          scope: 'cpu-electricity-only',
+          emissionFactor: {
+            countryCode: emissionFactor.countryCode,
+            unit: 'gCO2e/kWh',
+            value: emissionFactor.factor_g,
+            source: "electricity-mix (configured)"
+          },
+          energy: {
+            value: carbon.energy_Kwh,
+            unit: 'kWh'
+          },
+          emissions: {
+            value: carbon.carbon_gCO2e,
+            unit: 'gCO2e'
+          },
+        }
+      }
+
+      //-------------output to stream if needed---------
+      if(outputStream && options.shareData) {
+          const snapshot = buildJsonSnapshot(options.shareData);
+          const line = JSON.stringify(snapshot) + "\n";
+
+          if(!outputStream.write(line)) {
+            //handle backpressure
+            await once(outputStream, 'drain');
+          }
+
+          if(options.output?.flush) {
+            outputStream.emit('flush');//simple, user-defined event to signal flush
+          }
+      }
+
 
     } catch (error) {
       console.error("Error in main loop tick:", error);
@@ -134,11 +235,16 @@ export function startMainLoop(options: LoopOptions) {
     (intervalId as any).unref();
   }
 
-  // premier tick immédiat (fire-and-forget)
+  // first immediate tick (fire-and-forget)
   void tick();
 
   return {
-    stop: () => clearInterval(intervalId),
-    tick, // pour déclencher manuellement si besoin
+    stop: () => {
+      clearInterval(intervalId);
+      if (outputStream) {
+        outputStream.end();
+      }
+    },
+    tick, // to trigger manually if needed
   };
 }

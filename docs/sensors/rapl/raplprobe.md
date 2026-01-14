@@ -279,9 +279,9 @@ Quelques idées pour utiliser raplProbe de manière “green” :
 
   - appeler raplProbe() au démarrage pour découvrir les paquets,
 
-  - ensuite lire directement les fichiers energy_uj toi-même (en utilisant les chemins fournis) dans une boucle plus fréquente.
+  - ensuite lire directement les fichiers energy_uj (en utilisant les chemins fournis) dans une boucle plus fréquente.
 
-3. Gérer proprement les permissions
+1. Gérer proprement les permissions
 
 - Si DEGRADED avec reason = “permission denied”,
 c’est qu’il faut ajuster les droits plutôt que réessayer en boucle.
