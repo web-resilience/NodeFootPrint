@@ -1,7 +1,8 @@
-import { buildJsonSnapshot, CpuReader, estimateCarbonFootprint, HostToPidSlidingWindow, ProcessCpuReader } from "../index.js";
+import { buildJsonSnapshot, CpuReader, estimateCarbonFootprint, HostToPidSlidingWindow, processCpuReader } from "../index.js";
 import { EnergyReader } from "../sensors/rapl/enregyReader.js";
 import { createWriteStream } from "fs";
 import { once } from "events";
+import { collectSamples } from "../sampling/collectSamples.js";
 
 interface LoopOptions {
   periodMs?: number;
@@ -14,7 +15,7 @@ interface LoopOptions {
   samplers: {
     energyReader: EnergyReader;
     cpuReader: CpuReader;
-    processCpuReader?: ProcessCpuReader;
+    processCpuReader?: processCpuReader;
   };
   output?: {
     path?: string;//ex: './metrics.jsonl'
@@ -73,12 +74,8 @@ export async function startMainLoop(options: LoopOptions) {
     lastLoopMs = nowNs;
 
     try {
-      const { energyReader, cpuReader, processCpuReader } = options.samplers;
-      const [energySample, cpuSample, processCpuSample] = await Promise.all([
-        energyReader ? energyReader.sample(nowNs) : Promise.resolve(null),
-        cpuReader ? cpuReader.sample(nowNs) : Promise.resolve(null),
-        processCpuReader ? processCpuReader.sample() : Promise.resolve(null)
-      ]);
+      
+      const {energy, cpu, processCpu } = await collectSamples(options.samplers,nowNs);
 
       if (!options.shareData) {
         return;
@@ -90,9 +87,9 @@ export async function startMainLoop(options: LoopOptions) {
         options.shareData.intervalSeconds = intervalSeconds;
       }
       //-------------energy consumption---------
-      if (energySample && energySample.ok && energySample.primed && options.shareData) {
+      if (energy && energy.ok && energy.primed && options.shareData) {
 
-        const { deltaJ, packages, internalClampedDt } = energySample;
+        const { deltaJ, packages, internalClampedDt } = energy;
         // total across all packages
         // raw values
         const hostEnergyJoules = deltaJ;
@@ -127,14 +124,14 @@ export async function startMainLoop(options: LoopOptions) {
       //-------------cpu / host utilisation---------
 
       if (
-        cpuSample &&
-        cpuSample.ok &&
-        cpuSample.primed &&
+        cpu &&
+        cpu.ok &&
+        cpu.primed &&
         options.shareData
       ) {
 
-        const { deltaActiveTicks, deltaIdleTicks, deltaTotalTicks, unit } = cpuSample.cpuTicks;
-        const internalCpuDt = cpuSample.internalClampedDt;
+        const { deltaActiveTicks, deltaIdleTicks, deltaTotalTicks, unit } = cpu.cpuTicks;
+        const internalCpuDt = cpu.internalClampedDt;
         options.shareData.cpu = {
           cpuTicks: {
             unit,
@@ -149,17 +146,17 @@ export async function startMainLoop(options: LoopOptions) {
         };
       }
       //-------------process cpu utilisation---------
-      if (processCpuSample && processCpuSample.ok && options.shareData) {
+      if (processCpu && processCpu.ok && options.shareData) {
         //attribute host energy to process
         const result = slidingWindow.push({
           hostEnergyJoules: options.shareData.rapl?.hostEnergyJoules.value ?? 0,
           hostCpuActiveTicks: options.shareData.cpu?.cpuTicks.deltaActiveTicks ? BigInt(options.shareData.cpu.cpuTicks.deltaActiveTicks) : 0n,
-          processCpuActiveTicks: processCpuSample.cpuTicks.deltaActive
+          processCpuActiveTicks: processCpu.cpuTicks.deltaActive
         });
 
         if (result.ok) {
           options.shareData.process = {
-            pid: processCpuSample.pid,
+            pid: processCpu.pid,
             cpuShare: result.cpuShare,
             energyJoules: result.processEnergyJoules,
             windowSamples: result.samples,
@@ -171,7 +168,7 @@ export async function startMainLoop(options: LoopOptions) {
         } else {
           options.shareData.process = {
             ok: false,
-            pid: processCpuSample.pid,
+            pid: processCpu.pid,
             error: result.reason || 'attribution_failed'
           }
         }
