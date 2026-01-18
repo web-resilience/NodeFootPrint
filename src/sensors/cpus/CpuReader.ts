@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
-import { clampDt } from "../rapl/RaplReader.js";
-import { accessReadable, extractErrorCode, reasonFromCode } from "../../../utils/file-utils.js";
+import { clampDt } from "../../timer/timing.js";
+import { extractErrorCode, reasonFromCode } from "../../../utils/file-utils.js";
 
 interface CpuReaderOptions {
     log?: 'silent' | 'debug';
@@ -115,7 +115,7 @@ export async function parseProcStat(file: string = '/proc/stat') {
  * @param snapshot Aggregate CPU statistics snapshot
  * @returns Object containing idle, active, and total CPU ticks
  */
-export async function computeCpuUtilization(snapshot: ProcStatSnapshot['aggregate']): Promise<CpuTotal> {
+export function computeCpuUtilization(snapshot: ProcStatSnapshot['aggregate']): CpuTotal {
     const _snapshot = snapshot ?? {
         user: BigInt(0),
         iowait: BigInt(0),
@@ -166,7 +166,7 @@ export class CpuReader {
             return { ok: false, error: String(snapshot.error) };
         }
         const aggregate = snapshot?.aggregate;
-        const stats = await computeCpuUtilization(aggregate);
+        const stats =  computeCpuUtilization(aggregate);
         if (this.log === "debug") {
             process.stdout.write(`CPU stats idle:${stats.idle} active:${stats.active}, total:${stats.total}\n`);
         }

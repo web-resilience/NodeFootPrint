@@ -17,6 +17,11 @@ export function splitCommand(input: string): string[] {
             continue;
         }
 
+        if (!quote && (char === "'" || char === '"')) {
+            quote = char as any;
+            continue;
+        }
+
         if (quote) {
             if (char === quote) {
                 quote = null;

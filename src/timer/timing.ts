@@ -52,13 +52,32 @@ export function sleepMs(ms: number): Promise<void> {
  * La vérité du réveil, c'est nowNs() après l'attente.
  */
 
-export async function sleepUntilNs(dealineNs: bigint): Promise<void> {
-    const remainingNs = dealineNs - nowNs();
+export async function sleepUntilNs(deadlineNs: bigint,signal?:AbortSignal): Promise<void> {
+    const remainingNs = deadlineNs - nowNs();
     if (remainingNs <= 0n) return;
 
     const remainingMs = nsToMsCeil(remainingNs);
 
     // setTimeout a une limite max (~24,8 jours en ms),
     // pour des periods d'audit (1s, 200ms, etc.) aucun souci.
-    await sleepMs(remainingMs)
+    if(!signal) {
+        await sleepMs(remainingMs);
+        return;
+    }
+
+    await Promise.race([
+        sleepMs(remainingMs),
+        new Promise<void>((resolve) => signal.addEventListener("abort", () => resolve(),{once:true}))
+    ]);
+    
+}
+
+
+export function clampDt(dt: number, min = 0.2, max = 5): number {
+    if (!Number.isFinite(dt) || dt <= 0) {
+        return min;
+    }
+    if (dt < min) return min;
+    if (dt > max) return max;
+    return dt;
 }

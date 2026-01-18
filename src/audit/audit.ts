@@ -8,6 +8,8 @@ function nsToMs(ns: bigint): number {
     return Number(ns) / Number(NS_PER_MS);
 }
 
+const JOULES_PER_KWH = 3_600_000;
+
 interface AuditOptions {
     pid: number;
     durationSeconds: number;
@@ -33,7 +35,8 @@ interface AuditResult {
     processCpuEnergyJoules: number;
     processCpuEnergyShare: number;
 
-    carbon_gCO2e: number;
+    hostCpuCarbon_gCO2e:number;
+    processCpuCarbon_gCO2e: number;
     isActive: boolean;
 }
 
@@ -127,11 +130,15 @@ export async function audit(options: AuditOptions):Promise<AuditResult> {
     const isActive = totalProcessCpuActiveTicks > 0n;
 
     // Calcul carbone
-    const processCpuEnergyKWh =
-        processCpuEnergyJoules / 3_600_000;
+    const processCpuEnergyKwh =
+        processCpuEnergyJoules / JOULES_PER_KWH ;
+    
+    const hostCpuEnergyKwh = hostCpuEnergyJoules / JOULES_PER_KWH;
 
-    const carbon_gCO2e =
-        processCpuEnergyKWh * emissionFactor_gCO2ePerKWh;
+    const processCpuCarbon_gCO2e =
+        processCpuEnergyKwh * emissionFactor_gCO2ePerKWh;
+    
+        const hostCpuCarbon_gCO2e = hostCpuEnergyKwh * emissionFactor_gCO2ePerKWh;
 
     if (debugTiming) {
         console.log(
@@ -147,7 +154,8 @@ export async function audit(options: AuditOptions):Promise<AuditResult> {
         processCpuEnergyJoules,
         processCpuEnergyShare,
 
-        carbon_gCO2e,
+        hostCpuCarbon_gCO2e,
+        processCpuCarbon_gCO2e,
         isActive,
     };
 }

@@ -1,4 +1,5 @@
 import { RaplPackageInfo, RaplProbeResult } from './rapl-probe.js';
+import { clampDt } from '../../timer/timing.js';
 import { readFile } from 'fs/promises';
 import * as readline from 'node:readline';
 
@@ -36,15 +37,6 @@ interface RaplReaderPackageState {
 interface RaplReaderState {
     lastNs: bigint | null;
     packages: RaplReaderPackageState[];
-}
-
-export function clampDt(dt: number, min = 0.2, max = 5): number {
-    if (!Number.isFinite(dt) || dt <= 0) {
-        return min;
-    }
-    if (dt < min) return min;
-    if (dt > max) return max;
-    return dt;
 }
 
 export class RaplReader {

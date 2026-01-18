@@ -6,7 +6,7 @@ import path from 'node:path';
 import os from 'node:os';
 import process from 'node:process';
 
-import { accessReadable, listDirectories, listFiles } from '../../utils/file-utils.js';
+import { accessReadable, listDirectories, listFiles } from './file-utils.js';
 
 // Temporary directory for tests
 const tmpRoot = path.join(os.tmpdir(), `file-utils-tests-${process.pid}`);

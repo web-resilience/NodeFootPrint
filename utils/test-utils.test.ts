@@ -5,7 +5,7 @@ import { mkdtemp, readFile, access, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { createRaplPackages } from '../../utils/test-utils.js';
+import { createRaplPackages } from './test-utils.js';
 
 test('createRaplPackages creates files with default values (maxRange=0n → no max_range file)', async () => {
   const baseDir = await mkdtemp(join(tmpdir(), 'rapl-test-default-'));

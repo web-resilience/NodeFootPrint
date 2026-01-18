@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import process from "node:process";
 import { parseArgs } from "node:util";
-import { spawn } from "node:child_process";
+import {  spawn } from "node:child_process";
 import { once } from "node:events";
 import { splitCommand } from "./splitCommand.js";
 import { audit } from "../audit/audit.js";
@@ -52,22 +52,26 @@ async function killGracefully(child: import("node:child_process").ChildProcess, 
   }
 }
 
-function spawnTarget(commandStr:string) {
+async function spawnTarget(commandStr:string) {
 const argv = splitCommand(commandStr);
-
   if (argv.length === 0) {
     throw new Error("--spawn: command is empty");
   }
-
   const [cmd, ...args] = argv;
 
-  console.log(cmd,args)
+  //most generic solution using which spawn('which',[node,args])
+  const executable = cmd === "node" ? process.execPath : cmd;
 
   //  IMPORTANT : PAS de shell ici -> PID correct
-  const child = spawn(cmd, args, {
-    stdio: "inherit",
+  const child = spawn(executable, args,{
+    cwd:undefined,
+    shell:false,
+    stdio:'inherit'
   });
-
+  await new Promise<void>((resolve,reject) => {
+    child.once('spawn', () =>  resolve());
+    child.once('error', (error) => reject(error));
+  })
   return child;
 }
 
@@ -91,11 +95,11 @@ export async function auditCommand(argv = process.argv.slice(2)) {
   const tickMs = values.tick ? Number(values.tick) : 1000;
   const debugTiming = !!values.debugTiming;
 
-  if(!Number.isFinite(durationSeconds) || durationSeconds <= 0n) {
+  if(!Number.isFinite(durationSeconds) || durationSeconds <= 0) {
     throw new Error("--duration must be > 0");
   }
 
-  if(!Number.isFinite(tickMs) || tickMs <= 0n) {
+  if(!Number.isFinite(tickMs) || tickMs <= 0) {
     throw new Error("--tick must be > 0");
   }
 
@@ -105,7 +109,7 @@ export async function auditCommand(argv = process.argv.slice(2)) {
   let pid:number;
 
   if(values.spawn) {
-    child = spawnTarget(values.spawn);
+    child = await spawnTarget(values.spawn);
 
     if(!child?.pid) {
       throw new Error("spawn failed: missing pid");
@@ -132,6 +136,8 @@ export async function auditCommand(argv = process.argv.slice(2)) {
 
   const samplers = await createSamplers(pid);
 
+  console.log(`Starting audit for PID:${pid}...please wait`);
+
   // run audit
 
   const result = await audit({
@@ -157,7 +163,15 @@ export async function auditCommand(argv = process.argv.slice(2)) {
   console.log(`Host CPU energy: ${result.hostCpuEnergyJoules.toFixed(3)} J`);
   console.log(`Process CPU energy: ${result.processCpuEnergyJoules.toFixed(3)} J`);
   console.log(`Process energy share: ${(result.processCpuEnergyShare * 100).toFixed(2)} %`);
-  console.log(`Carbon footprint: ${result.carbon_gCO2e.toFixed(6)} gCO2e`);
+  console.log("--------------------------");
+  console.log(`Average CPU Power:`);
+  console.log(`Host avg CPU power: ${result.hostCpuEnergyJoules / result.durationSeconds} W`);
+  console.log(`Process avg CPU power: ${result.processCpuEnergyJoules / result.durationSeconds} W`);
+  console.log("--------------------------");
+  console.log(`CPU Carbon Footprint:`);
+  console.log(`Emission Factor country:Global, factor:475`);
+  console.log(`Host CPU carbon footprint: ${result.hostCpuCarbon_gCO2e.toFixed(6)} gCO2e`);
+  console.log(`Process CPU carbon footprint: ${result.processCpuCarbon_gCO2e.toFixed(6)} gCO2e`);
   console.log(`Process active: ${result.isActive ? "yes" : "no"}`);
 
 }

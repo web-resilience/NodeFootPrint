@@ -31,7 +31,7 @@ export async function accessReadable(file:string):Promise<AccessResult> {
     return { ok:true };
   } catch (error) {
       const code = extractErrorCode(error);
-      return { ok: false, error: reasonFromCode(code) || reasonFromCode('EACCESS') };
+      return { ok: false, error: reasonFromCode(code ?? 'EACCES') };
   }
 }
 
