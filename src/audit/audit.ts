@@ -1,4 +1,4 @@
-import { collectSamples } from "../sampling/collectSamples.js";
+import { collectSamples } from "../sampling/sampling.js";
 import { AuditAccumulator } from "./AuditAccumulator.js";
 import { fixedRateTicks } from "../timer/scheduler.js";
 import { NS_PER_MS, nowNs } from "../timer/timing.js";
@@ -22,9 +22,11 @@ interface AuditOptions {
     };
 
     emissionFactor_gCO2ePerKWh: number;
-    debugTiming: boolean;
 
-    signal?:AbortSignal
+    debugTiming: boolean;
+    debugMeta?: boolean;
+
+    signal?: AbortSignal
 }
 
 interface AuditResult {
@@ -35,12 +37,33 @@ interface AuditResult {
     processCpuEnergyJoules: number;
     processCpuEnergyShare: number;
 
-    hostCpuCarbon_gCO2e:number;
+    hostCpuCarbon_gCO2e: number;
     processCpuCarbon_gCO2e: number;
     isActive: boolean;
+
+    meta?: {
+        tickMs: number;
+        tickCount: number;
+        skippedPeriodsTotal: bigint | string;
+
+        energyPrimedSamples: number;
+        cpuPrimedSamples: number;
+
+        processOkSamples: number;
+        processErrorSamples: number;
+        firstProcessError: string | null;
+
+        totalHostCpuActiveTicks?:bigint | string;
+        totalProcessCpuActiveTicks?:bigint | string;
+
+        endReason: "duration" | "aborted";
+
+        // petits hints utiles pour comprendre un "0 J"
+        notes?: string[];
+    };
 }
 
-export async function audit(options: AuditOptions):Promise<AuditResult> {
+export async function audit(options: AuditOptions): Promise<AuditResult> {
     const {
         pid,
         durationSeconds,
@@ -48,12 +71,32 @@ export async function audit(options: AuditOptions):Promise<AuditResult> {
         samplers,
         emissionFactor_gCO2ePerKWh,
         debugTiming = false,
+        debugMeta = false,
     } = options;
 
+    //start audit
     const startTimeNs = process.hrtime.bigint();
     const endTimeNsTarget = startTimeNs + BigInt(Math.floor(durationSeconds * 1e9));
 
     const accumulator = new AuditAccumulator(startTimeNs);
+
+    //debug meta init
+
+    let tickCount = 0;
+    let skippedPeriodsTotal = 0n
+
+    let energyPrimedSamples = 0;
+    let cpuPrimedSamples = 0;
+
+    let processOkSamples = 0;
+    let processErrorSamples = 0;
+
+    let firstProcessError: string | null = null;
+
+    let endReason: "duration" | "aborted" = "duration";
+
+    const notes: string[] = [];
+    // end debug meta init
 
     for await (const tick of fixedRateTicks({
         periodMs: tickMs,
@@ -62,12 +105,38 @@ export async function audit(options: AuditOptions):Promise<AuditResult> {
     })) {
 
         // condition fin de loop 
-        if(options.signal?.aborted) break;
-        if (tick.startNs >= endTimeNsTarget) break;
+        if (options.signal?.aborted) {
+            endReason = "aborted";
+            break;
+        }
+        if (tick.startNs >= endTimeNsTarget) {
+            endReason = "duration"
+            break;
+        }
+
+        //for debugMeta
+        tickCount++;
+        skippedPeriodsTotal += tick.skippedPeriods;
+        //
 
         const workStartNs = nowNs();//pour debug durée travail 
 
         const samples = await collectSamples(samplers, tick.startNs);
+
+        //--meta stats (for -vv)
+
+        if (samples.energy?.ok && samples.energy.primed) energyPrimedSamples++;
+        if (samples.cpu?.ok && samples.cpu.primed) cpuPrimedSamples++;
+
+        if (samples.processCpu?.ok) {
+            processOkSamples++;
+        } else if (samples.processCpu && (samples.processCpu as any).ok === false) {
+            processErrorSamples++;
+            const error = (samples.processCpu as any).error ?? "unknown";
+            if (!firstProcessError) firstProcessError = error;
+        }
+
+
 
         accumulator.push({
             hostCpuEnergyJoules:
@@ -131,14 +200,30 @@ export async function audit(options: AuditOptions):Promise<AuditResult> {
 
     // Calcul carbone
     const processCpuEnergyKwh =
-        processCpuEnergyJoules / JOULES_PER_KWH ;
-    
+        processCpuEnergyJoules / JOULES_PER_KWH;
+
     const hostCpuEnergyKwh = hostCpuEnergyJoules / JOULES_PER_KWH;
 
     const processCpuCarbon_gCO2e =
         processCpuEnergyKwh * emissionFactor_gCO2ePerKWh;
-    
-        const hostCpuCarbon_gCO2e = hostCpuEnergyKwh * emissionFactor_gCO2ePerKWh;
+
+    const hostCpuCarbon_gCO2e = hostCpuEnergyKwh * emissionFactor_gCO2ePerKWh;
+
+    //-- in case of "0"
+    if (!isActive) {
+
+        if (processErrorSamples > 0) {
+            notes.push(`Process sampling errors=${processErrorSamples} (first=${firstProcessError ?? "unkown"})`);
+            if (firstProcessError === "file_not_found") {
+                notes.push("process likely ended before a second sample (priming) could be taken");
+                notes.push("tip: use --spawn for short-lived commands or lower --tick (e.g. 100ms)");
+            }
+        } else if (processOkSamples > 0) {
+            notes.push("process sampled ok but stayed idle (0 active ticks) during the window");
+        } else {
+            notes.push("process sampler not configured or never produced samples");
+        }
+    }
 
     if (debugTiming) {
         console.log(
@@ -157,5 +242,23 @@ export async function audit(options: AuditOptions):Promise<AuditResult> {
         hostCpuCarbon_gCO2e,
         processCpuCarbon_gCO2e,
         isActive,
+
+        meta: debugMeta ? {
+            tickMs,
+            tickCount,
+            skippedPeriodsTotal:skippedPeriodsTotal.toString(),
+
+            energyPrimedSamples,
+            cpuPrimedSamples,
+
+            processOkSamples,
+            processErrorSamples,
+            firstProcessError,
+            totalHostCpuActiveTicks:totalHostCpuActiveTicks.toString(),
+            totalProcessCpuActiveTicks:totalProcessCpuActiveTicks.toString(),
+
+            endReason
+
+        } : undefined
     };
 }

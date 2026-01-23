@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { collectSamples } from "./collectSamples.js";
+import { collectSamples } from "./sampling.js";
 
 test("collectSamples: must collect sample without reader", async (t) => {
     const samples = await collectSamples({},0n);
