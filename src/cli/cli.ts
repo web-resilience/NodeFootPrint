@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import process from "node:process";
+//import { readFile } from "node:fs/promises";
 import { parseArgs } from "node:util";
 import {  spawn } from "node:child_process";
 import { once } from "node:events";
@@ -62,7 +63,7 @@ const argv = splitCommand(commandStr);
   //most generic solution using which spawn('which',[node,args])
   const executable = cmd === "node" ? process.execPath : cmd;
 
-  //  IMPORTANT : PAS de shell ici -> PID correct
+  //  IMPORTANT : NO SHELL HERE -> correct PID
   const child = spawn(executable, args,{
     cwd:undefined,
     shell:false,
@@ -136,6 +137,9 @@ export async function auditCommand(argv = process.argv.slice(2)) {
 
   const samplers = await createSamplers(pid);
 
+  //const comm = await readFile(`/proc/${pid}/comm`, "utf-8").catch(() => null);
+  //if (comm) console.log(`Target comm: ${comm.trim()}`);
+
   console.log(`Starting audit for PID:${pid}...please wait`);
 
   // run audit
@@ -157,23 +161,24 @@ export async function auditCommand(argv = process.argv.slice(2)) {
 
    // 5) afficher résultat
   console.log("\nCPU Energy Audit (bounded)");
-  console.log("--------------------------");
+  console.log("\n--------------------------\n");
   console.log(`PID: ${result.pid}`);
   console.log(`Duration: ${result.durationSeconds.toFixed(2)} s`);
+  console.log("\n---------ENERGY-----------\n");
   console.log(`Host CPU energy: ${result.hostCpuEnergyJoules.toFixed(3)} J`);
   console.log(`Process CPU energy: ${result.processCpuEnergyJoules.toFixed(3)} J`);
   console.log(`Process energy share: ${(result.processCpuEnergyShare * 100).toFixed(2)} %`);
-  console.log("--------------------------");
+  console.log("\n-----------POWER----------\n");
   console.log(`Average CPU Power:`);
   console.log(`Host avg CPU power: ${result.hostCpuEnergyJoules / result.durationSeconds} W`);
   console.log(`Process avg CPU power: ${result.processCpuEnergyJoules / result.durationSeconds} W`);
-  console.log("--------------------------");
+  console.log("\n-----------CARBON---------\n");
   console.log(`CPU Carbon Footprint:`);
   console.log(`Emission Factor country:Global, factor:475`);
   console.log(`Host CPU carbon footprint: ${result.hostCpuCarbon_gCO2e.toFixed(6)} gCO2e`);
   console.log(`Process CPU carbon footprint: ${result.processCpuCarbon_gCO2e.toFixed(6)} gCO2e`);
+  console.log("\n--------------------------\n");
   console.log(`Process active: ${result.isActive ? "yes" : "no"}`);
-
 }
 
 await auditCommand();

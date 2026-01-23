@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test, { before, after } from 'node:test';
-import { createEnergyReader, raplProbe } from '../../index.js';
+import { createEnergyReader } from './enregyReader.js';
+import { raplProbe } from './rapl-probe.js';
 import { createRaplPackages } from '../../../utils/test-utils.js';
 import fs from 'node:fs/promises';
 import path from 'node:path';

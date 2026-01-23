@@ -1,7 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { CpuReader, parseProcStat, computeCpuUtilization, clampDt } from "../../index.js";
-import { rm, writeFile, chmod } from "node:fs/promises";
+import { CpuReader, parseProcStat, computeCpuUtilization } from "./CpuReader.js";
+import { clampDt } from "../../timer/timing.js";
+import { rm, writeFile } from "node:fs/promises";
 import process from 'node:process';
 import path from "node:path";
 import os from "node:os";

@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import path from 'node:path';
-import { RaplReader, clampDt, raplProbe } from "../../index.js";
+import { RaplReader} from "./RaplReader.js";
+import { raplProbe } from './rapl-probe.js';
+import { clampDt } from '../../timer/timing.js';
 import { createRaplPackages, nowNs } from '../../../utils/test-utils.js';
 import { chmod, rm, writeFile,mkdir}from 'node:fs/promises';
 import os from 'node:os';
