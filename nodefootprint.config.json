@@ -1,0 +1,13 @@
+{
+    "emissionFactor": {
+        "country":"GLOBAL",
+        "factor":475
+    },
+    "fallback":{
+        "pidleWatts":3.2,
+        "pmaxWatts":25,
+        "tdpWatts":45,
+        "idleFraction":0.07,
+        "maxFraction":0.55
+    }
+}

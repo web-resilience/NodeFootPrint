@@ -3,7 +3,22 @@ import { spawnTarget, killGracefully, extractVerbosity, parsePositiveNumberFromC
 import { audit } from "../../audit/audit.js";
 import { createSamplers } from "../../sampling/sampling.js";
 import { printHelp } from "./help-command.js";
+import { AppConfig, loadConfig } from "../../config/config.js";
+import { EmpiricalEnergyReaderOptions } from "../../sensors/rapl/EmpiricalEnergyReader.js";
 
+
+//parameter resolution order
+
+//CLIFLAGS > CONFIG > ERROR
+
+//if rapl ok
+//else
+//if --pidleW and pmaxW in cli options OK
+//else if tdp in cli options OK
+//else search for config file with pidleW and pmaxW or tdp
+//else ERROR
+
+//TODO when -v dispaly source or options (via cli or via config)
 
 export async function auditCommand(argv = process.argv.slice(2)) {
 
@@ -16,6 +31,8 @@ export async function auditCommand(argv = process.argv.slice(2)) {
     args: rest,
     options: {
       help: { type: "boolean" },
+
+      config: { type: "string" },
 
       pid: { type: "string" },
       spawn: { type: "string" },
@@ -43,21 +60,26 @@ export async function auditCommand(argv = process.argv.slice(2)) {
     return;
   }
 
+  //load config if needed
+  const configPath = values.config;
+  const config: AppConfig | null = configPath ? await loadConfig(configPath) : null;
+
+
   const tdp = values.tdp ? Number(values.tdp) : undefined;
   const pidleWatts = values.pidleW ? Number(values.pidleW) : undefined;
   const pmaxWatts = values.pmaxW ? Number(values.pmaxW) : undefined;
 
-  const hasIdle = Number.isFinite(pidleWatts);
-  const hasMax = Number.isFinite(pmaxWatts);
+  const hasIdleCli = Number.isFinite(pidleWatts);
+  const hasMaxCli = Number.isFinite(pmaxWatts);
 
-  if (hasIdle !== hasMax) {
-    throw new Error("Use both --pidle-w and --pmax-w together (or none)");
+  if (hasIdleCli !== hasMaxCli) {
+    throw new Error("Use both --pidleW and --pmaxW together (or none)");
   }
 
-  if (hasIdle && (pidleWatts as number) <= 0) throw new Error("--pidle-w must be > 0");
-  if (hasMax && (pmaxWatts as number) <= 0) throw new Error("--pmax-w must be > 0");
-  if (hasIdle && (pmaxWatts as number) < (pidleWatts as number)) {
-    throw new Error("--pmax-w must be >= --pidle-w");
+  if (hasIdleCli && (pidleWatts as number) <= 0) throw new Error("--pidleW must be > 0");
+  if (hasMaxCli && (pmaxWatts as number) <= 0) throw new Error("--pmaxW must be > 0");
+  if (hasIdleCli && (pmaxWatts as number) < (pidleWatts as number)) {
+    throw new Error("--pmaxW must be >= --pidleW");
   }
   if (values.tdp && (!Number.isFinite(tdp as any) || (tdp as number) <= 0)) {
     throw new Error("--tdp must be > 0");
@@ -65,11 +87,24 @@ export async function auditCommand(argv = process.argv.slice(2)) {
 
   const durationSeconds = parsePositiveNumberFromCommand('--duration', values.duration, 10);
   const tickMs = parsePositiveNumberFromCommand('--tick', values.tick, 1000);
-  const emissionFactor = parsePositiveNumberFromCommand('--ef', values.ef, 475);
+
+  const emissionFactor = values.ef ? parsePositiveNumberFromCommand('--ef', values.ef, 475) :
+    (config?.emissionFactor?.factor ?? 475);
 
   const debugTiming = !!values.debugTiming;
   const jsonOutput = !!values.json;
   const keepAlive = !!values.keepAlive;
+
+  //merge with config 
+
+  const configFallback:Partial<EmpiricalEnergyReaderOptions> = config?.fallback ?? {};
+  const fallback = {
+    pidleWatts: hasIdleCli ? (pidleWatts as number) : configFallback.pidleWatts,
+    pmaxWatts: hasMaxCli ? (pmaxWatts as number) : configFallback.pmaxWatts,
+    tdpWatts: values.tdp ? (tdp as number) : configFallback.tdpWatts,
+    idleFraction: configFallback.idleFraction,
+    maxFraction: configFallback.maxFraction,
+  }
 
   const controller = new AbortController();
 
@@ -102,13 +137,20 @@ export async function auditCommand(argv = process.argv.slice(2)) {
     throw new Error("Missing target: use --pid <pid> or --spawn \"cmd\"");
   }
 
-  const samplers = await createSamplers(pid, {
-    tdpWatts: values.tdp ? (tdp as number) : undefined,
-    pidleWatts:hasIdle ? (pidleWatts as number) : undefined,
-    pmaxWatts:hasMax ? (pmaxWatts as number) : undefined
-  });
+  const samplers = await createSamplers(pid, fallback);
 
   //--- optionnal context in verbose mode
+
+  const energyReader = samplers.energyReader;
+
+  //if calibration not set in options or in config file error
+  if (!energyReader.isReady) {
+    if(child) killGracefully(child,1000);
+    const error = `Energy measurement unavailable: 
+    RAPL not available and fallback not configured.\n
+    Provide --pidleW/--pmaxW (recommended), or --tdp, or use --config <file>.`
+    throw new Error(error);
+  }
 
 
   if (verbose) {
@@ -120,9 +162,6 @@ export async function auditCommand(argv = process.argv.slice(2)) {
     console.log(`Emission factor: ${emissionFactor} gCO2e/kWh`);
     console.log("");
   }
-
-
-
 
   console.log(`Starting audit for PID:${pid}...please wait`);
 
