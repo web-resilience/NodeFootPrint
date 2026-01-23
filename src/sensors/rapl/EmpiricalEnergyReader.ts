@@ -39,6 +39,7 @@ function clamp01(x: number) {
 
 
 export class EmpiricalEnergyReader {
+    public readonly mode = 'fallback';
     public cpuReader: CpuReader;
 
     public isReady = true;

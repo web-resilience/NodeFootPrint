@@ -209,6 +209,12 @@ export async function killGracefully(child: import("node:child_process").ChildPr
   }
 }
 
+function keepLast(text: string, chunk: Buffer, maxBytes = 64_000) {
+  text += chunk.toString("utf-8");
+  if (text.length > maxBytes) text = text.slice(text.length - maxBytes);
+  return text;
+}
+
 export async function spawnTarget(commandStr:string) {
 const argv = splitCommand(commandStr);
   if (argv.length === 0) {
@@ -223,13 +229,32 @@ const argv = splitCommand(commandStr);
   const child = spawn(executable, args,{
     cwd:undefined,
     shell:false,
-    stdio:'inherit'
+    stdio:"pipe" // capture output todo: set as cli options ? 
   });
+
+  // Capture output if piped (prevents terminal pollution + avoids backpressure)
+
+  let childStdout = "";
+  let childStderr = "";
+
+  if(child.stdout) {
+    child.stdout.on('data', (chunk) => {
+      childStdout = keepLast(childStdout,chunk);
+    });
+    child.stdout.resume();
+  }
+
+  if(child.stderr) {
+    child.stderr.on('data', (chunk) => {
+      childStderr = keepLast(childStderr,chunk);
+    });
+  }
+
   await new Promise<void>((resolve,reject) => {
     child.once('spawn', () =>  resolve());
     child.once('error', (error) => reject(error));
   })
-  return child;
+  return {child, childStdout,childStderr};
 }
 
 export function parsePositiveNumberFromCommand(name:string,v:string | undefined,fallback:number) {

@@ -88,16 +88,26 @@ export async function auditCommand(argv = process.argv.slice(2)) {
   const durationSeconds = parsePositiveNumberFromCommand('--duration', values.duration, 10);
   const tickMs = parsePositiveNumberFromCommand('--tick', values.tick, 1000);
 
-  const emissionFactor = values.ef ? parsePositiveNumberFromCommand('--ef', values.ef, 475) :
-    (config?.emissionFactor?.factor ?? 475);
-
   const debugTiming = !!values.debugTiming;
   const jsonOutput = !!values.json;
   const keepAlive = !!values.keepAlive;
 
+  const emissionFactor = values.ef ? parsePositiveNumberFromCommand('--ef', values.ef, 475) :
+    (config?.emissionFactor?.factor ?? 475);
+
+  //track source for debug
+  const emissionFactorSource = values.ef ? "cli" : config?.emissionFactor?.factor ? "config" : "default";
+  const fallbackSource =
+    hasIdleCli ? "cli" :
+      (isFinite(config?.fallback?.pidleWatts as number) && isFinite(config?.fallback?.pmaxWatts as number)) ? "config" :
+        values.tdp ? "cli" :
+          isFinite(config?.fallback?.tdpWatts as number) ? "config" :
+            "missing";
+
+
   //merge with config 
 
-  const configFallback:Partial<EmpiricalEnergyReaderOptions> = config?.fallback ?? {};
+  const configFallback: Partial<EmpiricalEnergyReaderOptions> = config?.fallback ?? {};
   const fallback = {
     pidleWatts: hasIdleCli ? (pidleWatts as number) : configFallback.pidleWatts,
     pmaxWatts: hasMaxCli ? (pmaxWatts as number) : configFallback.pmaxWatts,
@@ -112,7 +122,8 @@ export async function auditCommand(argv = process.argv.slice(2)) {
   let pid: number;
 
   if (values.spawn) {
-    child = await spawnTarget(values.spawn);
+    const spawned = await spawnTarget(values.spawn);
+    child = spawned.child;
 
     if (!child?.pid) {
       throw new Error("spawn failed: missing pid");
@@ -145,7 +156,7 @@ export async function auditCommand(argv = process.argv.slice(2)) {
 
   //if calibration not set in options or in config file error
   if (!energyReader.isReady) {
-    if(child) killGracefully(child,1000);
+    if (child) killGracefully(child, 1000);
     const error = `Energy measurement unavailable: 
     RAPL not available and fallback not configured.\n
     Provide --pidleW/--pmaxW (recommended), or --tdp, or use --config <file>.`
@@ -154,12 +165,26 @@ export async function auditCommand(argv = process.argv.slice(2)) {
 
 
   if (verbose) {
-    const comm = await tryReadProcComm(pid);
-    if (comm) console.log(`Target comm: ${comm}`);
-    const er = samplers.energyReader;
-    if (er?.status) console.log(`Energy reader: ${er.status}`);
-    if (er?.hint) console.log(`Energy hint ${er.hint}`);
-    console.log(`Emission factor: ${emissionFactor} gCO2e/kWh`);
+    if (values.config) console.log(`Config: ${values.config}`);
+
+    const er: any = samplers.energyReader;
+
+    console.log(`Energy source: ${String(er?.mode ?? "unknown").toUpperCase()}`);
+
+    if (er?.mode === "fallback") {
+      console.log(`Fallback params source: ${fallbackSource.toUpperCase()}`);
+      // optionnel: afficher les watts choisis
+      if (fallback.pidleWatts && fallback.pmaxWatts) {
+        console.log(`Fallback model: P_idle=${fallback.pidleWatts}W P_max=${fallback.pmaxWatts}W`);
+      } else if (fallback.tdpWatts) {
+        console.log(`Fallback model: TDP=${fallback.tdpWatts}W`);
+      }
+    }
+
+    console.log(
+      `Emission factor: ${emissionFactor} gCO2e/kWh (source: ${emissionFactorSource.toUpperCase()})`
+    );
+
     console.log("");
   }
 
@@ -191,11 +216,14 @@ export async function auditCommand(argv = process.argv.slice(2)) {
 
 
   // 5) print result
+  console.log("==============================");
   console.log("\nCPU Energy Audit (bounded)");
   console.log("\n--------------------------\n");
+  console.log(new Date().toLocaleDateString());
   console.log(`PID: ${result.pid}`);
   console.log(`Duration: ${result.durationSeconds.toFixed(2)} s`);
   console.log("\n---------ENERGY-----------\n");
+  console.log(`Source: ${energyReader.mode}`);
   console.log(`Host CPU energy: ${result.hostCpuEnergyJoules.toFixed(3)} J`);
   console.log(`Process CPU energy: ${result.processCpuEnergyJoules.toFixed(3)} J`);
   console.log(`Process energy share: ${(result.processCpuEnergyShare * 100).toFixed(2)} %`);
@@ -205,13 +233,15 @@ export async function auditCommand(argv = process.argv.slice(2)) {
   console.log(`Process avg CPU power: ${result.processCpuEnergyJoules / result.durationSeconds} W`);
   console.log("\n-----------CARBON---------\n");
   console.log(`CPU Carbon Footprint:`);
-  console.log(`Emission Factor country:Global, factor:475`);
+  console.log(`Emission Factor:475`);
   console.log(`Host CPU carbon footprint: ${result.hostCpuCarbon_gCO2e.toFixed(6)} gCO2e`);
   console.log(`Process CPU carbon footprint: ${result.processCpuCarbon_gCO2e.toFixed(6)} gCO2e`);
   console.log("\n--------------------------\n");
   console.log(`Process active: ${result.isActive ? "yes" : "no"}`);
+  console.log("\n--------------------------\n");
   if (debugMeta && (result as any).meta) {
     console.log("\nDebug meta:");
     console.log(JSON.stringify((result as any).meta, null, 2));
   }
+  console.log("nodefootprint v.0.0.1");
 }

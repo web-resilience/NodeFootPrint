@@ -45,6 +45,8 @@ export class RaplReader {
     private probeStatus: string | null = null;
     private probeHints: string | null = null;
 
+    public readonly mode = 'rapl';
+
     constructor(options: RaplReaderOptions) {
         const { probe, log } = options;
         this.log = log ?? 'silent';

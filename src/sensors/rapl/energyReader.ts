@@ -5,6 +5,7 @@ export interface EnergyReader {
     isReady: boolean;
     status: string | null;
     hint: string | null;
+    mode:'rapl' | 'fallback';
     sample(nowNs: bigint): Promise<RaplSample | null>;
 }
 
@@ -37,6 +38,5 @@ export function createEnergyReader(options: EnergyReaderFactoryOptions): EnergyR
         statFilePath: fb.statFilePath,
         log: fb.log ?? "silent"
     });
-    
     return energyReader;
 }
