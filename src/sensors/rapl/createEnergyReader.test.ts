@@ -39,7 +39,7 @@ test('createEnergyReader test suite', async (t) => {
             const probe = await raplProbe(tmpRoot);
             const reader = createEnergyReader({ probe });
             // Rétablir les permissions pour le nettoyage
-            assert.equal(reader.status, 'NOT_IMPLEMENTED_YET');
+            assert.equal(reader.status, 'MISSING_FALLBACK_PARAMS');
             await fs.chmod(raplPackage.files.energyPath, 0o644);
         }
     });
