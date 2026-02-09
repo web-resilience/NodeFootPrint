@@ -3,8 +3,8 @@ import test from 'node:test';
 import path from 'node:path';
 import { RaplReader} from "./RaplReader.js";
 import { raplProbe } from './rapl-probe.js';
-import { clampDt } from '../../timer/timing.js';
-import { createRaplPackages, nowNs } from '../../../utils/test-utils.js';
+import { clampDt } from '../../timers/timing.js';
+import { createRaplPackages, nowNs } from '../../utils/test-utils.js';
 import { chmod, rm, writeFile,mkdir}from 'node:fs/promises';
 import os from 'node:os';
 

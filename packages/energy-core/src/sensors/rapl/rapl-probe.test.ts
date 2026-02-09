@@ -5,7 +5,7 @@ import path from 'node:path';
 import os from 'node:os';
 import process from 'node:process';
 import { raplProbe } from './rapl-probe.js';
-import { createRaplPackages } from '../../../utils/test-utils.js';
+import { createRaplPackages } from '../../utils/test-utils.js';
 
 
 test('rapl-probe test-suite', async (t) => {

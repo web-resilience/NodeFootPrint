@@ -6,7 +6,7 @@ import { audit } from "../../audit/audit.js";
 import { createSamplers } from "../../sampling/sampling.js";
 import { printHelp } from "./help-command.js";
 import { AppConfig, loadConfig } from "../../config/config.js";
-import { EmpiricalEnergyReaderOptions } from "../../sensors/rapl/EmpiricalEnergyReader.js";
+import { EmpiricalEnergyReaderOptions } from "../../index.js";
 
 
 //parameter resolution order

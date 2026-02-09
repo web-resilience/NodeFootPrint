@@ -1,7 +1,7 @@
 import { CpuReader } from "../sensors/cpus/CpuReader.js";
 import { ProcessCpuReader } from "../sensors/cpus/ProcessCpuReader.js";
-import { EnergyReader, EnergyReaderFactoryOptions, createEnergyReader } from "../sensors/rapl/energyReader.js";
-import { raplProbe } from "../sensors/rapl/rapl-probe.js";
+import { EnergyReader, EnergyReaderFactoryOptions, createEnergyReader } from "../index.js";
+import { raplProbe } from "../index.js";
 
 
 export interface Samplers {

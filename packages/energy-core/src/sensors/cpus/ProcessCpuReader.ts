@@ -1,6 +1,6 @@
 import process from "node:process";
 import { readFile } from "node:fs/promises";
-import { extractErrorCode, reasonFromCode } from "../../../utils/file-utils.js";
+import { extractErrorCode, reasonFromCode } from "@nodefootprint/shared";
 
 
 interface ProcessCpuReaderOptions {

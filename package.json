@@ -5,7 +5,8 @@
   "packageManager": "pnpm@10.14.0",
   "scripts": {
     "dev:nf":"pnpm --filter nodefootprint dev",
-    "dev:nf-test":"pnpm --filter nodefootprint test",
+    "test-nf":"pnpm --filter nodefootprint test",
+    "test-ec":"pnpm --filter @nodefootprint/energy-core test",
     "test": "pnpm -r test",
     "build": "pnpm -r build"
   },
@@ -17,7 +18,9 @@
   },
    "dependencies": {
     "ajv": "^8.17.1",
-    "fastify": "^5.6.2"
+    "fastify": "^5.6.2",
+    "@nodefootprint/energy-core":"workspace:*",
+    "@nodefootprint/shared":"workspace:*"
   }
 }
 

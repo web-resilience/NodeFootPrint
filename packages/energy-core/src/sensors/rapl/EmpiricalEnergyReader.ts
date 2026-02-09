@@ -1,4 +1,4 @@
-import { CpuReader } from "../cpus/CpuReader.js";
+import { CpuReader } from "../cpus/CpuReader";
 import { RaplSample } from "./RaplReader.js";
 
 

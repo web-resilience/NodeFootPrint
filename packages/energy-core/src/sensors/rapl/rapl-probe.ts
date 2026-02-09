@@ -1,7 +1,7 @@
 import fs from "node:fs/promises";
 import { Dirent } from "node:fs";
 import path from "node:path";
-import { accessReadable } from "../../../utils/file-utils.js";
+import { accessReadable } from "@nodefootprint/shared";
 
 
 type RaplStatus = 'OK' | 'DEGRADED' | 'FAILED';

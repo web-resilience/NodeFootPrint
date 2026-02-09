@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { ProcessCpuReader,pidIsValid,parsePidStatFile } from "./ProcessCpuReader.js";
-import { generateStatSample } from "../../../utils/test-utils.js";
+import { generateStatSample } from "../../utils/test-utils.js";
 import process from "node:process";
 import { writeFile,rm,mkdir } from "node:fs/promises";
 import os from "node:os";

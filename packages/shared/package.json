@@ -1,12 +1,12 @@
 {
-  "name": "@nodefootprint/energy-core",
+  "name": "@nodefootprint/shared",
   "version": "0.1.0",
   "type": "module",
   "exports": {
     ".": "./src/index.ts"
   },
   "scripts": {
-    "test": "c8 node --import tsx --test src/**/**/*.test.ts",
+    "test": "c8 node --import tsx --test src/**/*.test.ts",
     "build": "tsc -b"
   }
 }

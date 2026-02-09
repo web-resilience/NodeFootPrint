@@ -1,5 +1,5 @@
 import { RaplPackageInfo, RaplProbeResult } from './rapl-probe.js';
-import { clampDt } from '../../timer/timing.js';
+import { clampDt } from '../../timers/timing.js';
 import { readFile } from 'fs/promises';
 import * as readline from 'node:readline';
 

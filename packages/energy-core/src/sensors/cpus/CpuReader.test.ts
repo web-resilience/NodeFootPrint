@@ -1,12 +1,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { CpuReader, parseProcStat, computeCpuUtilization } from "./CpuReader.js";
-import { clampDt } from "../../timer/timing.js";
+import { clampDt } from "../../timers/timing.js";
 import { rm, writeFile } from "node:fs/promises";
 import process from 'node:process';
 import path from "node:path";
 import os from "node:os";
-import { createStatFileUnderControl, nowNs as generateNowNs } from "../../../utils/test-utils.js";
+import { createStatFileUnderControl, nowNs as generateNowNs } from "../../utils/test-utils.js";
 
 test('CpuReader test suite', async (t) => {
     //peu probable mais si pour une obscure raison absent ou invalide
