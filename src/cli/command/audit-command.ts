@@ -1,4 +1,6 @@
 import { parseArgs } from "node:util";
+import  process  from "node:process";
+import path from "node:path";
 import { spawnTarget, killGracefully, extractVerbosity, parsePositiveNumberFromCommand, tryReadProcComm } from "./command-utils.js";
 import { audit } from "../../audit/audit.js";
 import { createSamplers } from "../../sampling/sampling.js";
@@ -61,8 +63,8 @@ export async function auditCommand(argv = process.argv.slice(2)) {
   }
 
   //load config if needed
-  const configPath = values.config;
-  const config: AppConfig | null = configPath ? await loadConfig(configPath) : null;
+  const configPath = values.config ?? path.resolve(process.cwd(),'nodefootprint.config.json');
+  const config: AppConfig | undefined | null = configPath ? await loadConfig(configPath) : null;
 
 
   const tdp = values.tdp ? Number(values.tdp) : undefined;
