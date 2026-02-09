@@ -17,6 +17,7 @@ async function main(argv:string[] = process.argv.slice(2)) {
 }
 
 await main().catch((err) => {
-  console.error(err);
+  console.error(err.message);
+  printHelp();
   process.exit(1);
 });
