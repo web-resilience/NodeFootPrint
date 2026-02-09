@@ -1,0 +1,16 @@
+{
+  "name": "nodefootprint",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "test": "c8 node --import tsx --test **/*.test.{js,ts}",
+    "test:rapl": "c8 node --import tsx --test src/sensors/rapl/RaplReader.test.ts",
+    "test:cpu": "c8 node --import tsx --test src/sensors/cpus/CpuReader.test.ts",
+    "test:process": "c8 node --import tsx --test src/sensors/cpus/ProcessCpuReader.test.ts",
+    "test:cli": "c8 node --import tsx --test src/cli/cli.test.ts",
+    "dev": "sudo $(which node) --import tsx src/cli/cli.ts",
+    "dev:server": "curl -s http://localhost:3000/metrics | jq . || echo 'No data yet'",
+    "build": "tsc -b",
+    "start": "node --import tsx src/index.ts"
+  }
+}

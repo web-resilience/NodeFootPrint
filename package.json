@@ -1,33 +1,24 @@
 {
-  "name": "Nodefootprint",
-  "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "name": "nodefootprint-workspace",
+  "private": true,
   "type": "module",
-  "scripts": {
-    "test": "c8 node --import tsx --test **/*.test.{js,ts}",
-    "test:rapl": "c8 node --import tsx --test src/sensors/rapl/RaplReader.test.ts",
-    "test:cpu": "c8 node --import tsx --test src/sensors/cpus/CpuReader.test.ts",
-    "test:process": "c8 node --import tsx --test src/sensors/cpus/ProcessCpuReader.test.ts",
-    "test:cli":"c8 node --import tsx --test src/cli/cli.test.ts",
-    "dev": "sudo $(which node) --import tsx src/cli/cli.ts",
-    "dev:server":"curl -s  http://localhost:3000/metrics | jq . || echo 'No data yet'",
-    "build": "tsc -b",
-    "start": "node --import tsx src/index.ts",
-    "stress:cpu":""
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
   "packageManager": "pnpm@10.14.0",
-  "devDependencies": {
+  "scripts": {
+    "dev:nf":"pnpm --filter nodefootprint dev",
+    "dev:nf-test":"pnpm --filter nodefootprint test",
+    "test": "pnpm -r test",
+    "build": "pnpm -r build"
+  },
+    "devDependencies": {
     "@types/node": "^24.10.1",
     "c8": "^10.1.3",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3"
   },
-  "dependencies": {
+   "dependencies": {
     "ajv": "^8.17.1",
     "fastify": "^5.6.2"
   }
 }
+
+
