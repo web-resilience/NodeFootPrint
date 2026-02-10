@@ -7,8 +7,8 @@ export { raplProbe } from "./sensors/rapl/rapl-probe";
 export type { RaplPackageInfo, RaplProbeResult } from "./sensors/rapl/rapl-probe";
 
 // Re-export depuis energyReader et EmpiricalEnergyReader
-export { EnergyReader, createEnergyReader } from "./sensors/rapl/energyReader";
-export type { EnergyReaderFactoryOptions } from "./sensors/rapl/energyReader";
+export { createEnergyReader } from "./sensors/rapl/energyReader";
+export type { EnergyReaderFactoryOptions, EnergyReader } from "./sensors/rapl/energyReader";
 export { EmpiricalEnergyReader } from "./sensors/rapl/EmpiricalEnergyReader";
 export type { EmpiricalEnergyReaderOptions } from "./sensors/rapl/EmpiricalEnergyReader";
 
@@ -17,3 +17,5 @@ export { ProcessCpuReader } from "./sensors/cpus/ProcessCpuReader";
 
 export * from "./timers/scheduler";
 export * from "./timers/timing";
+export * from "./sampling/sampling";
+export * from "./audit/audit";

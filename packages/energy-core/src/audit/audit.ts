@@ -1,7 +1,7 @@
 import { collectSamples } from "../sampling/sampling.js";
 import { AuditAccumulator } from "./AuditAccumulator.js";
-import { fixedRateTicks } from "../timer/scheduler.js";
-import { NS_PER_MS, nowNs } from "../timer/timing.js";
+import { fixedRateTicks } from "../timers/scheduler.js";
+import { NS_PER_MS, nowNs } from "../timers/timing.js";
 
 
 function nsToMs(ns: bigint): number {

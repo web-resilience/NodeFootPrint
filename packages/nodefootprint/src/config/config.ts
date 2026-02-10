@@ -1,5 +1,5 @@
 import { readFile } from "fs/promises";
-import { extractErrorCode } from "../../utils/file-utils.js";
+import { extractErrorCode } from "@nodefootprint/shared";
 
 export interface AppConfig {
     emissionFactor?: {
